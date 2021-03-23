@@ -279,21 +279,6 @@ class SimpleGlyph:
         sym.attrib['height'] = str(height)
         sym.attrib['viewBox'] = f'{xmin} {-ymax} {width} {height}'
         sym.append(self.svgpath())
-        
-        #org = ET.SubElement(sym, 'rect')
-        #org.attrib['x'] = str(xmin)
-        #org.attrib['y'] = str(-ymax)
-        #org.attrib['width'] = str(width)
-        #org.attrib['height'] = str(height)
-        #org.attrib['fill'] = 'none'
-        #org.attrib['stroke'] = 'orange'
-        
-        #org = ET.SubElement(sym, 'circle')
-        #org.attrib['cx'] = '0'
-        #org.attrib['cy'] = '0'
-        #org.attrib['r'] = '1'
-        #org.attrib['stroke'] = 'green'
-        #org.attrib['fill'] = 'green'
         return sym
 
     def svg(self, fontsize: float=None) -> str:

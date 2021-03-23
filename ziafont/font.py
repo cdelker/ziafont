@@ -59,8 +59,8 @@ class Font:
             if table != 'head':
                 self._verifychecksum(table)
 
-#        if 'glyf' not in self.tables:
-#            raise ValueError('Unsupported font (no glyf table).')
+        if 'glyf' not in self.tables:
+            raise ValueError('Unsupported font (no glyf table).')
 
     def _verifychecksum(self, table: str) -> None:
         ''' Verify checksum of table. Raises ValueError if invalid. '''
@@ -241,17 +241,6 @@ class Font:
             Args:
                 glyphid: Glyph index used to find glyph data
         '''
-#        offset = self._glyphoffset(glyphid)  # Offset into glyf table
-#        if offset is None:
-#            return EmptyGlyph(glyphid, self)
-#
-#        if offset >= self.tables['glyf'].offset + self.tables['glyf'].length:
-#            return EmptyGlyph(glyphid, self)
-
-#        assert offset >= self.tables['glyf'].offset
-#        assert offset < self.tables['glyf'].offset + self.tables['glyf'].length
-
-#        self.fontfile.seek(offset)
         return read_glyph(glyphid, self)
 
     def advance(self, glyph1: int, glyph2: int=None, kern: bool=True):
@@ -315,7 +304,7 @@ class Font:
                 word.append(glyph.place(x+leftshift, yvals[lineidx], fontsize))
         return word, symbols, totwidth, height
 
-    def strwidth(self, s: str, fontsize: float=12, linespacing: float=1) -> tuple[float, float]:
+    def strsize(self, s: str, fontsize: float=12, linespacing: float=1) -> tuple[float, float]:
         ''' Calculate width and height (including ascent/descent) of string '''
         _, _, width, height = self._buildstring(s, fontsize=fontsize, linespacing=linespacing)
         return width, height
