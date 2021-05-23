@@ -97,3 +97,15 @@ The method :py:meth:`ziafont.font.Font.strsize` can be used to calculate the pix
 .. jupyter-execute::
 
     font.strsize('How wide is this string?')
+
+
+SVG Version Compatibility
+-------------------------
+
+Some SVG renderers, including recent versions of Inkscape and some OS built-in image viewers, are not fully compatible with the SVG 2.0 specification.
+Set the `svg2` Font parameter to `False` for better compatibility. This may result in larger file sizes
+as each glyph is included as its own <path> element rather than being reused with <symbol> and <use> elements.
+
+.. code-block:: python
+
+    font = zf.Font('NotoSerif-Regular.ttf', svg2=False)

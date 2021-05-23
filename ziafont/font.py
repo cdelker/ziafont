@@ -13,17 +13,22 @@ from .glyph import read_glyph, dflt_fontsize, EmptyGlyph, SimpleGlyph, CompoundG
 from .fonttypes import GlyphComp, GlyphPath, BBox, AdvanceWidth, Layout, Header, Table, FontInfo
 
 
+DEBUG = False
+
+
 class Font:
     ''' Class to read/parse a OpenType/TTF and write glyphs to SVG
 
         Args:
             fname: File name of the font
+            svg2: Use SVG Version 2.0. Disable for better compatibility.
     '''
-    def __init__(self, fname: Union[str, Path]):
+    def __init__(self, fname: Union[str, Path], svg2: bool=True):
         self.fname = fname
         with open(fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
         self.info = self._loadfont()  # Load in all the font metadata
+        self.svg2 = svg2
 
     def _loadfont(self) -> FontInfo:
         ''' Read font metadata '''
@@ -302,6 +307,8 @@ class Font:
                 leftshift = 0
             for glyph, x in lineglyphs:
                 word.append(glyph.place(x+leftshift, yvals[lineidx], fontsize))
+        if not self.svg2:
+            symbols = []
         return word, symbols, totwidth, height
 
     def strsize(self, s: str, fontsize: float=12, linespacing: float=1) -> tuple[float, float]:
@@ -338,11 +345,13 @@ class Font:
         elif canvas is not None:
             svg = canvas
 
+        xyorig = xy
         if canvas is not None:
             # Adjust vertical alignment -- #FIXME
-            yofst = {'base': 0,
-                     'top': height,
-                     'center': height/2}.get(valign, 0)
+            yofst = {'base': -linespacing*fontsize,
+                     'bottom': -height,
+                     'top': 0,
+                     'center': -height/2}.get(valign, 0)
             xofst = {'center': -width/2,
                      'right': -width}.get(halign, 0)
             xy = xy[0] + xofst, xy[1] + yofst
@@ -370,20 +379,23 @@ class Font:
             svg.attrib['width'] = str(width)
             svg.attrib['height'] = str(height)
             svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
+            if not self.svg2:
+                svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
             svg.attrib['viewBox'] = f'0 {-base} {width} {height}'
 
         # Get existing symbol/glyphs, add ones not there yet
-        existingsymbols = svg.findall('symbol')
-        symids = [sym.attrib.get('id') for sym in existingsymbols]
-        for sym in symbols:
-            if sym not in symids:
-                svg.append(sym)
-
+        if self.svg2:
+            existingsymbols = svg.findall('symbol')
+            symids = [sym.attrib.get('id') for sym in existingsymbols]
+            for sym in symbols:
+                if sym not in symids:
+                    svg.append(sym)
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({xy[0]} {xy[1]})'
+            word.attrib['transform'] = f'translate({xy[0]} {xy[1]+linespacing*fontsize})'
+        
         svg.append(word)
 
-        if False:  # Test viewbox
+        if DEBUG:  # Test viewbox
             rect = ET.SubElement(svg, 'rect')
             rect.attrib['x'] = f'{xy[0]}'
             rect.attrib['y'] = f'{xy[1]}'
@@ -392,9 +404,9 @@ class Font:
             rect.attrib['fill'] = 'none'
             rect.attrib['stroke'] = 'red'
             circ = ET.SubElement(svg, 'circle')
-            circ.attrib['cx'] = '0'
-            circ.attrib['cy'] = '0'
-            circ.attrib['r'] = '5'
+            circ.attrib['cx'] = f'{xyorig[0]}'
+            circ.attrib['cy'] = f'{xyorig[1]}'
+            circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
         return SVGdraw(svg)
@@ -409,7 +421,7 @@ class SVGdraw:
     def __init__(self, svgxml: ET.Element):
         self._svgxml = svgxml
         x, y, w, h = svgxml.attrib['viewBox'].split()
-        if False:  # Debug viewbox
+        if DEBUG:  # Debug viewbox
             rect = ET.SubElement(self._svgxml, 'rect')
             rect.attrib['x'] = f'{x}'
             rect.attrib['y'] = f'{y}'

@@ -203,10 +203,13 @@ class SimpleGlyph:
         ''' Get <use> svg tag translated/scaled to the right position '''
         fntscale = (fontsize/self.dfltsize)
         yshift = self.font.info.layout.ymax * self.emscale * fntscale
-        use = ET.Element('use')
-        use.attrib['href'] = f'#{self.id}'
-        use.attrib['transform'] = f'translate({x} {y-yshift}) scale({fntscale})'
-        return use
+        if self.font.svg2:
+            elm = ET.Element('use')
+            elm.attrib['href'] = f'#{self.id}'
+            elm.attrib['transform'] = f'translate({x} {y-yshift}) scale({fntscale})'
+        else:
+            elm = self.svgpath(x0=x, y0=y, scale=fntscale)
+        return elm
     
     def advance(self, nextchr=None, kern=True):
         ''' Get advance width in glyph units, including kerning if nextchr is defined '''
@@ -214,10 +217,11 @@ class SimpleGlyph:
             nextchr = nextchr.index
         return self.font.advance(self.index, nextchr, kern=kern)
     
-    def svgpath(self) -> ET.Element:
+    def svgpath(self, x0=0, y0=0, scale=1) -> ET.Element:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
-        height = (self.font.info.layout.ymax - self.font.info.layout.ymin) * self.emscale
-        base = height + self.font.info.layout.ymin*self.emscale
+        emscale = self.emscale * scale
+        height = (self.font.info.layout.ymax - self.font.info.layout.ymin) * emscale
+        base = height + self.font.info.layout.ymin*emscale
 
         # Split the contours
         xconts = []
@@ -233,8 +237,8 @@ class SimpleGlyph:
 
         path = ''
         for xvals, yvals, ctrl in zip(xconts, yconts, ctrls):
-            xx = [x*self.emscale for x in xvals]
-            yy = [-y*self.emscale for y in yvals]
+            xx = [x0 + x*emscale for x in xvals]
+            yy = [y0 - y*emscale for y in yvals]
             npoints = len(xx)
 
             path += f'M {xx[0]} {yy[0]} '
@@ -281,11 +285,11 @@ class SimpleGlyph:
         sym.append(self.svgpath())
         return sym
 
-    def svg(self, fontsize: float=None) -> str:
+    def svg(self, fontsize: float=None, svgver=2) -> str:
         ''' Get SVG as string '''
-        return ET.tostring(self.svgxml(fontsize), encoding='unicode')
+        return ET.tostring(self.svgxml(fontsize, svgver=svgver), encoding='unicode')
 
-    def svgxml(self, fontsize: float=None) -> ET.Element:
+    def svgxml(self, fontsize: float=None, svgver=2) -> ET.Element:
         ''' Standalong SVG '''
         fontsize = fontsize if fontsize else DEFAULT_FONTSIZE
         scale = fontsize / self.font.info.layout.unitsperem
@@ -306,12 +310,17 @@ class SimpleGlyph:
         svg.attrib['width'] = str(width)
         svg.attrib['height'] = str(height)
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
+        if not self.font.svg2:
+            svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
         svg.attrib['viewBox'] = f'{xmin} 0 {width} {height}'
         symbol = self.svgsymbol()
         svg.append(symbol)
 
         g = ET.SubElement(svg, 'use')
-        g.attrib['href'] = f'#{self.id}'
+        if self.font.svg2:
+            g.attrib['href'] = f'#{self.id}'
+        else:
+            g.attrib['xlink:href'] = f'#{self.id}'
         scale = fontsize/self.dfltsize
         g.attrib['transform'] = f'translate({xmin}, {base-ymax}) scale({scale})'
         return svg
