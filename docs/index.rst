@@ -22,6 +22,7 @@ Example
     s = font.str2svg('Z').svg()
     print(s[:80])  # Just show 80 characters here...
 
+|
 
 Installation
 ------------
@@ -35,6 +36,20 @@ Ziafont can be installed using pip:
 
 No dependencies are required.
 
+|
+
+Support
+-------
+
+If you appreciate Ziafont, buy me a coffee to show your support!
+
+.. raw:: html
+
+    <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="cdelker" data-color="#FFDD00" data-emoji=""  data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#000000" data-coffee-color="#ffffff" ></script>
+
+|
+
+----
 
 .. toctree::
    :maxdepth: 2

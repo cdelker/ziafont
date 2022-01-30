@@ -15,6 +15,7 @@ Strings can be converted to SVG using :py:meth:`ziafont.font.Font.str2svg`. This
 
     font.str2svg('Example')
 
+|
 
 Getting SVG data
 ----------------
@@ -35,6 +36,7 @@ Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3
 
 The default font size can be set for all future str2svg calls using :py:meth:`ziafont.glyph.set_fontsize`.
 
+|
 
 Drawing on an existing SVG
 --------------------------
@@ -63,6 +65,7 @@ To draw the string onto an existing SVG, create an SVG XML structure as an XML E
 
     SVG(ET.tostring(svg))
 
+|
 
 Multi-line strings
 ------------------
@@ -74,6 +77,7 @@ The resulting SVG does not require the font to be installed or available to rend
 
     font.str2svg('Two\nLines', halign='center', linespacing=.6)
 
+|
 
 Kerning
 -------
@@ -88,6 +92,7 @@ If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/open
 
     font.str2svg('VALVES', kern=False)
 
+|
 
 Calculating string size
 -----------------------
@@ -98,6 +103,7 @@ The method :py:meth:`ziafont.font.Font.strsize` can be used to calculate the pix
 
     font.strsize('How wide is this string?')
 
+|
 
 SVG Version Compatibility
 -------------------------

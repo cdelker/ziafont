@@ -26,6 +26,7 @@ Often, however, the glyph should be added to an existing drawing or used elsewhe
 The `svgpath` method returns the glyph as an SVG <path> element that can be inserted in an existing SVG.
 Alternatively, the `svgsymbol` method wraps the <path> in an SVG <symbol> element that can be reused multiple times in the same drawing.
 
+|
 
 Test Mode
 ---------
@@ -39,6 +40,7 @@ To view the bounding box and baseline of a glyph, use the `test` method:
 
 Notice how some glyphs can extend below the baseline (red).
 
+|
 
 Glyph Indexes
 -------------
