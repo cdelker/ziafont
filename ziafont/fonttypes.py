@@ -7,13 +7,16 @@ Header = namedtuple(
     'Header', ['version', 'revision', 'checksumadjust', 'magic', 'flags',
                'created', 'modified', 'macstyle', 'lowestrecppem',
                'directionhint', 'indextolocformat', 'glyphdataformat', 'numlonghormetrics'])
+FontNames = namedtuple('FontNames', ['copyright', 'family', 'subfamily', 'unique', 'name', 'nameversion',
+                       'postscript', 'trademark', 'manufacturer', 'designer',
+                       'description', 'vendorurl', 'designerurl', 'license', 'LicenseURL'])
 Layout = namedtuple(
     'Layout', ['unitsperem', 'xmin', 'xmax', 'ymin', 'ymax',
                'ascent', 'descent', 'advwidthmax',
                'minleftbearing', 'minrightbearing'])
 FontInfo = namedtuple(
-    'FontInfo', ['name', 'header', 'layout', 'advwidths'])
+    'FontInfo', ['filename', 'names', 'header', 'layout', 'advwidths'])
 
-GlyphPath = namedtuple('GlyphPath', ['xvals', 'yvals', 'ctvals', 'ends', 'bbox', ])####'advwidth'])
+GlyphPath = namedtuple('GlyphPath', ['xvals', 'yvals', 'ctvals', 'ends', 'bbox', ])
 GlyphComp = namedtuple('GlyphComp', ['glyphs', 'xforms', 'bbox'])
 Xform = namedtuple('Xform', ['a', 'b', 'c', 'd', 'e', 'f', 'match'])

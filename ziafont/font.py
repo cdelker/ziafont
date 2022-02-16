@@ -10,7 +10,7 @@ from .fontread import FontReader
 from . import gpos
 from .cmap import Cmap12, Cmap4
 from .glyph import read_glyph, dflt_fontsize, EmptyGlyph, SimpleGlyph, CompoundGlyph
-from .fonttypes import GlyphComp, GlyphPath, BBox, AdvanceWidth, Layout, Header, Table, FontInfo
+from .fonttypes import GlyphComp, GlyphPath, BBox, AdvanceWidth, Layout, Header, Table, FontInfo, FontNames
 
 
 DEBUG = False
@@ -36,7 +36,8 @@ class Font:
         header, layout = self._readheader()
         advwidths = self._readwidths(header.numlonghormetrics)
         self._readcmap()
-        info = FontInfo(self.fname, header, layout, advwidths)
+        names = self._readnames()
+        info = FontInfo(self.fname, names, header, layout, advwidths)
         
         self.gpos = None
         if 'GPOS' in self.tables:
@@ -127,6 +128,34 @@ class Font:
                         glyphdataformat, numlonghormetrics)
         return header, layout
 
+
+    def _readnames(self) -> FontNames:
+        ''' Read the "name" table which includes the font name,
+            copyright, and other info
+        '''
+        namefmt = self.fontfile.readuint16(self.tables['name'].offset)
+        nameids = [''] * 15  # Empty strings for nameId table
+
+        if namefmt == 0:  # '1' is not supported
+            count = self.fontfile.readuint16()
+            strofst = self.fontfile.readuint16()
+            namerecords = []
+            for i in range(count):
+                platformId = self.fontfile.readuint16()
+                platformSpecificId = self.fontfile.readuint16()
+                languageId = self.fontfile.readuint16()
+                nameId = self.fontfile.readuint16()
+                length = self.fontfile.readuint16()
+                offset = self.fontfile.readuint16()
+                namerecords.append((platformId, platformSpecificId, languageId,
+                                    nameId, length, offset))
+            for record in namerecords:
+                self.fontfile.seek(self.tables['name'].offset + strofst + record[5])
+                name = self.fontfile.read(record[4])
+                nameids[record[3]] = name.decode('utf-16be')
+
+        return FontNames(*nameids)
+    
     def _readwidths(self, numlonghormetrics: int) -> list[AdvanceWidth]:
         ''' Read `advanceWidth` and `leftsidebearing` from "htmx" table '''
         self.fontfile.seek(self.tables['hmtx'].offset)
@@ -337,6 +366,8 @@ class Font:
             Returns:
                 svg: SVG drawing object containing svg+xml element tree
         '''
+        fontsize = fontsize if fontsize else dflt_fontsize()
+
         word, symbols, width, height = self._buildstring(
             s, fontsize, linespacing, halign=halign, kern=kern)
 
@@ -347,7 +378,7 @@ class Font:
 
         xyorig = xy
         if canvas is not None:
-            # Adjust vertical alignment -- #FIXME
+            # Adjust vertical alignment
             yofst = {'base': -linespacing*fontsize,
                      'bottom': -height,
                      'top': 0,
@@ -373,7 +404,6 @@ class Font:
             svg.attrib['viewBox'] = f'{xmin} {ymin} {w} {h}'
 
         else:  # canvas is None, make a new SVG
-            fontsize = fontsize if fontsize else dflt_fontsize()
             base = self.info.layout.ymax * fontsize / self.info.layout.unitsperem
             svg = ET.Element('svg')
             svg.attrib['width'] = str(width)

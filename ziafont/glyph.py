@@ -192,7 +192,7 @@ class SimpleGlyph:
         self.index = index
         self.path = path
         self.font = font
-        basename, _ = os.path.splitext(os.path.basename(self.font.info.name))
+        basename, _ = os.path.splitext(os.path.basename(self.font.info.filename))
         self.id = f'{basename}_{index}'
         self.emscale = self.dfltsize / self.font.info.layout.unitsperem
         
