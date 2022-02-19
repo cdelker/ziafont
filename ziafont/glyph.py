@@ -241,7 +241,17 @@ class SimpleGlyph:
             yy = [y0 - y*emscale for y in yvals]
             npoints = len(xx)
 
-            path += f'M {xx[0]} {yy[0]} '
+            if ctrl[0]:
+                # Path STARTS with a control point. Wrap last point in path.
+                # Unna-Regular.ttf is an example.
+                if ctrl[1]:
+                    xim = (xx[0] + xx[1])/2
+                    yim = (yy[0] + yy[1])/2
+                    path += f'M {xx[-1]} {yy[-1]} Q {xx[0]} {yy[0]} {xim} {yim}'
+                else:
+                    path += f'M {xx[-1]} {yy[-1]} Q {xx[0]} {yy[0]} {xx[1]} {yy[1]}'
+            else:
+                path += f'M {xx[0]} {yy[0]} '
 
             i = 1
             while i < npoints:
