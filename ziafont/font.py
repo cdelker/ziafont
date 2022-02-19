@@ -35,12 +35,10 @@ class Font:
             self.fname = Path(name)
         elif name:
             self.fname = findfont(name)
-        else:
+        
+        if self.fname is None:
             with pkg_resources.path('ziafont.fonts', 'Lato-Regular.ttf') as p:
                 self.fname = p
-
-        if self.fname is None:
-            raise ValueError(f'Font not found: {name}')
 
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
