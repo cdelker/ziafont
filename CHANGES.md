@@ -1,5 +1,12 @@
 # Release notes
 
+### 0.3
+
+- Locate fonts by name from system font paths
+- Read font NAME table
+- Added Text class for drawing multiline text with a font
+
+
 ### 0.2
 
 - Added an option to use SVG1.x format for compatibility since SVG2.0 is not fully supported in all browsers/renderers yet.

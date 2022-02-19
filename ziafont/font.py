@@ -2,30 +2,47 @@
 
 from __future__ import annotations
 from typing import Literal, Sequence, Union, Optional
-from collections import namedtuple
+import sys
+import os
 from pathlib import Path
+from collections import namedtuple
+import importlib.resources as pkg_resources
 import xml.etree.ElementTree as ET
 
 from .fontread import FontReader
 from . import gpos
 from .cmap import Cmap12, Cmap4
-from .glyph import read_glyph, dflt_fontsize, EmptyGlyph, SimpleGlyph, CompoundGlyph
-from .fonttypes import GlyphComp, GlyphPath, BBox, AdvanceWidth, Layout, Header, Table, FontInfo, FontNames
+from .glyph import read_glyph, dflt_fontsize, SimpleGlyph, CompoundGlyph
+from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames
 
 
 DEBUG = False
+
+fontindex = None
 
 
 class Font:
     ''' Class to read/parse a OpenType/TTF and write glyphs to SVG
 
         Args:
-            fname: File name of the font
+            name: File name of the font
             svg2: Use SVG Version 2.0. Disable for better compatibility.
     '''
-    def __init__(self, fname: Union[str, Path], svg2: bool=True):
-        self.fname = fname
-        with open(fname, 'rb') as f:
+    def __init__(self, name: Union[str, Path]=None, svg2: bool=True):
+
+        self.fname = None
+        if name and Path(name).exists():
+            self.fname = Path(name)
+        elif name:
+            self.fname = findfont(name)
+        else:
+            with pkg_resources.path('ziafont.fonts', 'Lato-Regular.ttf') as p:
+                self.fname = p
+
+        if self.fname is None:
+            raise ValueError(f'Font not found: {name}')
+
+        with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
         self.info = self._loadfont()  # Load in all the font metadata
         self.svg2 = svg2
@@ -34,11 +51,11 @@ class Font:
         ''' Read font metadata '''
         self._readtables()
         header, layout = self._readheader()
-        advwidths = self._readwidths(header.numlonghormetrics)
+        self.advwidths = self._readwidths(header.numlonghormetrics)
         self._readcmap()
         names = self._readnames()
-        info = FontInfo(self.fname, names, header, layout, advwidths)
-        
+        info = FontInfo(self.fname, names, header, layout)
+
         self.gpos = None
         if 'GPOS' in self.tables:
             self.gpos = gpos.Gpos(self.tables['GPOS'].offset, self.fontfile)
@@ -128,7 +145,6 @@ class Font:
                         glyphdataformat, numlonghormetrics)
         return header, layout
 
-
     def _readnames(self) -> FontNames:
         ''' Read the "name" table which includes the font name,
             copyright, and other info
@@ -152,10 +168,14 @@ class Font:
             for record in namerecords:
                 self.fontfile.seek(self.tables['name'].offset + strofst + record[5])
                 name = self.fontfile.read(record[4])
-                nameids[record[3]] = name.decode('utf-16be')
+                if record[3] < 16:
+                    if record[0] == 1:  # Older MacOS (use is discouraged)
+                        nameids[record[3]] = name.decode('utf-8')
+                    else:  # Microsoft and Unicode formats
+                        nameids[record[3]] = name.decode('utf-16be')
 
         return FontNames(*nameids)
-    
+
     def _readwidths(self, numlonghormetrics: int) -> list[AdvanceWidth]:
         ''' Read `advanceWidth` and `leftsidebearing` from "htmx" table '''
         self.fontfile.seek(self.tables['hmtx'].offset)
@@ -256,7 +276,7 @@ class Font:
             nextofst = self.fontfile.readuint32()
         else:
             offset = self.fontfile.readuint16(self.tables['loca'].offset + index * 2) * 2
-            nextofst = self.fontfile.readuint32()
+            nextofst = self.fontfile.readuint16() * 2
 
         if offset == nextofst:
             # Empty glyphs (ie space) have no length.
@@ -280,138 +300,121 @@ class Font:
     def advance(self, glyph1: int, glyph2: int=None, kern: bool=True):
         ''' Get advance width in font units, including kerning adjustment if glyph2 is defined '''
         try:
-            adv = self.info.advwidths[glyph1].width
+            adv = self.advwidths[glyph1].width
         except IndexError:
-            adv = self.info.header.advwidthmax
-        
+            adv = self.info.layout.advwidthmax.width
+
         if kern and glyph2 and self.gpos:
             # Only getting x-advance for first glyph.
             adv += self.gpos.kern(glyph1, glyph2)[0].get('xadvance', 0)
         return adv
-    
-    def _buildstring(self, s: str, fontsize: float=None, linespacing: float=1,
-                     halign: str='left', kern=True) -> tuple[ET.Element, list[ET.Element], float, float]:
-        ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
-        fontsize = fontsize if fontsize else dflt_fontsize()
-        scale = fontsize / self.info.layout.unitsperem
-        fontheight = (self.info.layout.ymax - self.info.layout.ymin) * scale
-        lineheight = fontheight * linespacing
 
-        lines = s.splitlines()
-        yvals = [i*lineheight for i in range(len(lines))]  # valign == 'base'
-        height = yvals[-1] + fontheight
-
-        # Generate symbols and calculate x positions using left alignment
-        symbols: list[ET.Element] = []  # <symbol> elements
-        linewidths: list[float] = []
-        allglyphs = []  # (glyph, x) where x is left aligned
-        for line in lines:
-            lineglyphs = []
-            glyphs = [self.glyph(c) for c in line]
-            x = 0
-            for gidx, glyph in enumerate(glyphs):
-                if glyph.id not in [s.attrib['id'] for s in symbols]:
-                    symbols.append(glyph.svgsymbol())
-                lineglyphs.append((glyph, x))
-                nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
-                xadvance = glyph.advance(nextglyph, kern=kern)
-                x += (xadvance - min(0, glyph.path.bbox.xmin)) * scale
-
-            if glyph.path.bbox.xmax > xadvance:
-                # Make a bit wider to grab right edge that extends beyond advance width
-                x += (glyph.path.bbox.xmax - xadvance) * scale
-            linewidths.append(x)
-            allglyphs.append(lineglyphs)
-
-        # Place the glyphs based on halign
-        word = ET.Element('g')
-        word.attrib['word'] = s  # Just an identifier for debugging
-        totwidth = max(linewidths)
-        for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
-            if halign == 'center':
-                leftshift = (totwidth - linewidth)/2
-            elif halign == 'right':
-                leftshift = totwidth - linewidth
-            else:  # halign = 'left'
-                leftshift = 0
-            for glyph, x in lineglyphs:
-                word.append(glyph.place(x+leftshift, yvals[lineidx], fontsize))
-        if not self.svg2:
-            symbols = []
-        return word, symbols, totwidth, height
-
-    def strsize(self, s: str, fontsize: float=12, linespacing: float=1) -> tuple[float, float]:
+    def getsize(self, s) -> tuple[float, float]:
         ''' Calculate width and height (including ascent/descent) of string '''
-        _, _, width, height = self._buildstring(s, fontsize=fontsize, linespacing=linespacing)
-        return width, height
+        txt = Text(s, self)
+        return txt.getsize()
 
     def str2svg(self, s: str, fontsize: float=None, linespacing: float=1,
                 halign: Literal['left', 'center', 'right']='left',
                 valign: Literal['base', 'center', 'top']='base',
-                canvas: Union[ET.Element, SVGdraw]=None,
+                canvas: ET.Element=None,
                 xy: Sequence[float]=(0,0),
-               kern=True,
-               ) -> SVGdraw:
-        ''' Draw text to SVG
+                kern=True):
+        ''' Convert a string to SVG
 
             Args:
-                s: String to draw
-                fontsize: Size of font in points
-                linespacing: Fraction of font height between lines
-                halign: Horizontal alignment
-                valign: Vertical alignment (when placed on existing canvas)
-                canvas: Existing SVG to draw on
-                xy: Position to draw on existing canvas
-
-            Returns:
-                svg: SVG drawing object containing svg+xml element tree
+                s: String to convert.
+                fontsize: Font size in points
+                linespacing: Space between lines
+                halign: Horizontal Alignment
+                valign: Vertical Alignment
+                canvas: SVG XML element to draw on
+                xy: Position to draw on canvas
+                kern: Use font kerning adjustment
         '''
-        fontsize = fontsize if fontsize else dflt_fontsize()
-
-        word, symbols, width, height = self._buildstring(
-            s, fontsize, linespacing, halign=halign, kern=kern)
-
-        if isinstance(canvas, SVGdraw):
-            svg = canvas.svgxml()
-        elif canvas is not None:
-            svg = canvas
-
-        xyorig = xy
+        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern, svg2=self.svg2)
         if canvas is not None:
-            # Adjust vertical alignment
-            yofst = {'base': -linespacing*fontsize,
-                     'bottom': -height,
-                     'top': 0,
-                     'center': -height/2}.get(valign, 0)
-            xofst = {'center': -width/2,
-                     'right': -width}.get(halign, 0)
-            xy = xy[0] + xofst, xy[1] + yofst
+            txt.drawon(canvas, xy[0], xy[1])
+        return txt
 
-            # Expand SVG viewbox to fit
+
+class Text:
+    ''' Convert XML Element to SVG text with Jupyter representer.
+
+        Args:
+            s: String to draw
+            font: Font name or ziafont.Font to use
+            size: Font size in points
+            linespacing: Spacing between lines
+            halign: Horizontal Alignment
+            valign: Vertical Alignment
+            kern: Use kerning adjustment
+            svg2: Use SVG Version 2.0. Disable for better compatibility.
+    '''
+    def __init__(self, s: str,  font: Union[str, Font]=None,
+                 size: float=None, linespacing: float=1,
+                 halign: Literal['left', 'center', 'right']='left',
+                 valign: Literal['base', 'center', 'top']='base',
+                 kern: bool=True,
+                 svg2: bool=True):
+        self.str = s
+        self.halign = halign
+        self.valign = valign
+        self.size = size if size else dflt_fontsize()
+        self.linespacing = linespacing
+        self.svg2 = svg2
+        self.kern = kern
+        if font is None or isinstance(font, str):
+            self.font = Font(font)
+        else:
+            self.font = font
+
+    def svgxml(self) -> ET.Element:
+        ''' Get SVG XML element '''
+        svg = ET.Element('svg')
+        svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
+        return self.drawon(svg)
+
+    def svg(self) -> str:
+        ''' Get SVG string '''
+        return ET.tostring(self.svgxml(), encoding='unicode')
+
+    def _repr_svg_(self):
+        ''' Jupyter representer '''
+        return self.svg()
+
+    def drawon(self, svg: ET.Element, x: float=0, y: float=0):
+        ''' Draw text on the SVG '''
+        word, symbols, width, height = self._buildstring()
+
+        xyorig = x, y
+        # Adjust vertical alignment
+        yofst = {'base': -self.linespacing*self.size,
+                 'bottom': -height,
+                 'top': 0,
+                 'center': -height/2}.get(self.valign, 0)
+        xofst = {'center': -width/2,
+                 'right': -width}.get(self.halign, 0)
+        xy = x + xofst, y + yofst
+
+        # Expand SVG viewbox to fit
+        try:
             xmin, ymin, w, h = [float(f) for f in svg.attrib['viewBox'].split()]
-            if xmin + w < xy[0] + width:
-                w = xy[0] + width - xmin
-            if ymin + h < xy[1] + height:
-                h = xy[1] + height - ymin
-            if xmin > xy[0]:
-                w = xmin + w - xy[0]
-                xmin = xy[0]
-            if ymin > xy[1]:
-                h = ymin + h - xy[1]
-                ymin = xy[1]
-            svg.attrib['width'] = str(w)
-            svg.attrib['height'] = str(h)
-            svg.attrib['viewBox'] = f'{xmin} {ymin} {w} {h}'
-
-        else:  # canvas is None, make a new SVG
-            base = self.info.layout.ymax * fontsize / self.info.layout.unitsperem
-            svg = ET.Element('svg')
-            svg.attrib['width'] = str(width)
-            svg.attrib['height'] = str(height)
-            svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
-            if not self.svg2:
-                svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
-            svg.attrib['viewBox'] = f'0 {-base} {width} {height}'
+        except KeyError:
+            xmin = ymin = w = h = 0
+        if xmin + w < xy[0] + width:
+            w = xy[0] + width - xmin
+        if ymin + h < xy[1] + height:
+            h = xy[1] + height - ymin
+        if xmin > xy[0]:
+            w = xmin + w - xy[0]
+            xmin = xy[0]
+        if ymin > xy[1]:
+            h = ymin + h - xy[1]
+            ymin = xy[1]
+        svg.attrib['width'] = str(w)
+        svg.attrib['height'] = str(h)
+        svg.attrib['viewBox'] = f'{xmin} {ymin} {w} {h}'
 
         # Get existing symbol/glyphs, add ones not there yet
         if self.svg2:
@@ -421,8 +424,8 @@ class Font:
                 if sym not in symids:
                     svg.append(sym)
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({xy[0]} {xy[1]+linespacing*fontsize})'
-        
+            word.attrib['transform'] = f'translate({xy[0]} {xy[1]+self.linespacing*self.size})'
+
         svg.append(word)
 
         if DEBUG:  # Test viewbox
@@ -439,41 +442,105 @@ class Font:
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
-        return SVGdraw(svg)
+        return svg
+
+    def _buildstring(self) -> tuple[ET.Element, list[ET.Element], float, float]:
+        ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
+        scale = self.size / self.font.info.layout.unitsperem
+        fontheight = (self.font.info.layout.ymax - self.font.info.layout.ymin) * scale
+        lineheight = fontheight * self.linespacing
+
+        lines = self.str.splitlines()
+        yvals = [i*lineheight for i in range(len(lines))]  # valign == 'base'
+        height = yvals[-1] + fontheight
+
+        # Generate symbols and calculate x positions using left alignment
+        symbols: list[ET.Element] = []  # <symbol> elements
+        linewidths: list[float] = []
+        allglyphs = []  # (glyph, x) where x is left aligned
+        for line in lines:
+            lineglyphs = []
+            glyphs = [self.font.glyph(c) for c in line]
+            x = 0
+            for gidx, glyph in enumerate(glyphs):
+                if glyph.id not in [s.attrib['id'] for s in symbols]:
+                    symbols.append(glyph.svgsymbol())
+                lineglyphs.append((glyph, x))
+                nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
+                xadvance = glyph.advance(nextglyph, kern=self.kern)
+                x += (xadvance - min(0, glyph.path.bbox.xmin)) * scale
+
+            if glyph.path.bbox.xmax > xadvance:
+                # Make a bit wider to grab right edge that extends beyond advance width
+                x += (glyph.path.bbox.xmax - xadvance) * scale
+            linewidths.append(x)
+            allglyphs.append(lineglyphs)
+
+        # Place the glyphs based on halign
+        word = ET.Element('g')
+        word.attrib['word'] = self.str  # Just an identifier for debugging
+        totwidth = max(linewidths)
+        for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
+            if self.halign == 'center':
+                leftshift = (totwidth - linewidth)/2
+            elif self.halign == 'right':
+                leftshift = totwidth - linewidth
+            else:  # halign = 'left'
+                leftshift = 0
+            for glyph, x in lineglyphs:
+                word.append(glyph.place(x+leftshift, yvals[lineidx], self.size))
+        if not self.svg2:
+            symbols = []
+        return word, symbols, totwidth, height
+
+    def getsize(self) -> tuple[float, float]:
+        ''' Calculate width and height (including ascent/descent) of string '''
+        _, _, width, height = self._buildstring()
+        return width, height
+
+    def getyofst(self) -> float:
+        ''' Y-shift from bottom of bbox to 0 '''
+        return 0
 
 
-class SVGdraw:
-    ''' Convert XML Element to SVG text with Jupyter representer.
+def _build_fontlist():
+    ''' Generate list of system fonts locations and their names '''
+    if sys.platform.startswith('win'):
+        paths = [Path(r'C:\Windows\Fonts'),
+                 Path(os.path.expandvars(r'%APPDATA%\Microsoft\Windows\Fonts'))]
+    elif sys.platform.startswith('darwin'):
+        paths = [Path().home() / 'Library/Fonts',
+                 Path('/Library/Fonts/'),
+                 Path('/System/Library/Fonts')]
+    else:
+        paths = [Path('/usr/share/fonts/'),
+                 Path('/usr/local/share/fonts/'),
+                 Path().home() / '.fonts',
+                 Path().home() / '.local/share/fonts']
 
-        Args:
-            svgxml: Element tree containing SVG elements
-    '''
-    def __init__(self, svgxml: ET.Element):
-        self._svgxml = svgxml
-        x, y, w, h = svgxml.attrib['viewBox'].split()
-        if DEBUG:  # Debug viewbox
-            rect = ET.SubElement(self._svgxml, 'rect')
-            rect.attrib['x'] = f'{x}'
-            rect.attrib['y'] = f'{y}'
-            rect.attrib['width'] = str(w)
-            rect.attrib['height'] = str(h)
-            rect.attrib['fill'] = 'none'
-            rect.attrib['stroke'] = 'red'
-            circ = ET.SubElement(self._svgxml, 'circle')
-            circ.attrib['cx'] = '0'
-            circ.attrib['cy'] = '0'
-            circ.attrib['r'] = '5'
-            circ.attrib['fill'] = 'red'
-            circ.attrib['stroke'] = 'red'
+    fontlist = []
+    for p in paths:
+        fontlist.extend(p.rglob('*.ttf'))
+        fontlist.extend(p.rglob('*.otf'))
 
-    def svgxml(self) -> ET.Element:
-        ''' Get SVG XML element '''
-        return self._svgxml
+    findex = {}
+    for fname in fontlist:
+        try:
+            f = Font(fname)
+        except ValueError:
+            continue  # Unsupported Font
+        family = f.info.names.family.lower()
+        subfamily = f.info.names.subfamily.lower().replace('book', 'regular')
+        findex[(family, subfamily)] = fname
+    return findex
 
-    def svg(self) -> str:
-        ''' Get SVG string '''
-        return ET.tostring(self._svgxml, encoding='unicode')
 
-    def _repr_svg_(self):
-        ''' Jupyter representer '''
-        return self.svg()
+def findfont(name, style='Regular'):
+    ''' Find a font file by name '''
+    if Path(name).exists():
+        return Path(name)
+
+    global fontindex
+    if fontindex is None:
+        fontindex = _build_fontlist()
+    return fontindex.get((name.lower(), style.lower()), None)

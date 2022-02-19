@@ -15,8 +15,8 @@ Layout = namedtuple(
                'ascent', 'descent', 'advwidthmax',
                'minleftbearing', 'minrightbearing'])
 FontInfo = namedtuple(
-    'FontInfo', ['filename', 'names', 'header', 'layout', 'advwidths'])
+    'FontInfo', ['filename', 'names', 'header', 'layout'])
 
-GlyphPath = namedtuple('GlyphPath', ['xvals', 'yvals', 'ctvals', 'ends', 'bbox', ])
+GlyphPath = namedtuple('GlyphPath', ['xvals', 'yvals', 'ctvals', 'ends', 'bbox'])
 GlyphComp = namedtuple('GlyphComp', ['glyphs', 'xforms', 'bbox'])
 Xform = namedtuple('Xform', ['a', 'b', 'c', 'd', 'e', 'f', 'match'])

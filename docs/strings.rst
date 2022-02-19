@@ -9,6 +9,8 @@ Start by importing Ziafont and loading a font from a file:
     font = ziafont.Font('NotoSerif-Regular.ttf')
 
 
+The font name can be a path to a ttf or otf font file, or the name of a font (such as 'Arial') located in a system fonts path. If no font name is specified, a built-in font will be used.
+
 Strings can be converted to SVG using :py:meth:`ziafont.font.Font.str2svg`. This method returns a :py:class:`ziafont.font.SVGdraw` object, which provides a Jupyter representation of the string, but also has methods for getting the SVG as text or as an XML element.
 
 .. jupyter-execute::
@@ -34,7 +36,7 @@ Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3
 
     font.str2svg('Example').svgxml()
 
-The default font size can be set for all future str2svg calls using :py:meth:`ziafont.glyph.set_fontsize`.
+The default font size can be set for all future str2svg calls using :py:meth:`ziafont.set_fontsize`.
 
 |
 
@@ -97,11 +99,11 @@ If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/open
 Calculating string size
 -----------------------
 
-The method :py:meth:`ziafont.font.Font.strsize` can be used to calculate the pixel width and height of a string without drawing it.
+The method :py:meth:`ziafont.font.Font.getsize` can be used to calculate the pixel width and height of a string without drawing it.
 
 .. jupyter-execute::
 
-    font.strsize('How wide is this string?')
+    font.getsize('How wide is this string?')
 
 |
 

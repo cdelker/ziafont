@@ -5,7 +5,7 @@ API
 .. autoclass:: ziafont.font.Font
     :members:
 
-.. autoclass:: ziafont.font.SVGdraw
+.. autoclass:: ziafont.font.Text
     :members:
 
 .. autoclass:: ziafont.glyph.SimpleGlyph
