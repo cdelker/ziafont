@@ -182,7 +182,6 @@ def read_compoundglyph(font, index, charbox):
     return CompoundGlyph(index, comp, font)
 
 
-
 class SimpleGlyph:
     ''' Simple Glyph '''
     dfltsize = 12   # Draw <symbols> in this point size
@@ -315,24 +314,23 @@ class SimpleGlyph:
         width = xmax - xmin
         height = ymax - ymin
         base = ymax
-        
+        scale = fontsize/self.dfltsize
+
         svg = ET.Element('svg')
         svg.attrib['width'] = str(width)
         svg.attrib['height'] = str(height)
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
         if not self.font.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
-        svg.attrib['viewBox'] = f'{xmin} 0 {width} {height}'
-        symbol = self.svgsymbol()
-        svg.append(symbol)
-
-        g = ET.SubElement(svg, 'use')
-        if self.font.svg2:
-            g.attrib['href'] = f'#{self.id}'
+            elm = self.svgpath(x0=xmin, y0=base, scale=scale)
+            svg.append(elm)
         else:
-            g.attrib['xlink:href'] = f'#{self.id}'
-        scale = fontsize/self.dfltsize
-        g.attrib['transform'] = f'translate({xmin}, {base-ymax}) scale({scale})'
+            svg.attrib['viewBox'] = f'{xmin} 0 {width} {height}'
+            symbol = self.svgsymbol()
+            svg.append(symbol)
+            g = ET.SubElement(svg, 'use')
+            g.attrib['href'] = f'#{self.id}'
+            g.attrib['transform'] = f'translate({xmin}, {base-ymax}) scale({scale})'
         return svg
 
     def test(self) -> 'TestGlyph':
