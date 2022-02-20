@@ -26,15 +26,16 @@ class Font:
 
         Args:
             name: File name of the font
+            style: Font style such as "bold" or "italic", used when searching
+                system paths for a font file
             svg2: Use SVG Version 2.0. Disable for better compatibility.
     '''
-    def __init__(self, name: Union[str, Path]=None, svg2: bool=True):
-
+    def __init__(self, name: Union[str, Path]=None, style: str='regular', svg2: bool=True):
         self.fname = None
         if name and Path(name).exists():
             self.fname = Path(name)
         elif name:
-            self.fname = findfont(name)
+            self.fname = findfont(name, style)
         
         if self.fname is None:
             with pkg_resources.path('ziafont.fonts', 'Lato-Regular.ttf') as p:
