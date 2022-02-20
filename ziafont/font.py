@@ -167,9 +167,7 @@ class Font:
                 self.fontfile.seek(self.tables['name'].offset + strofst + record[5])
                 name = self.fontfile.read(record[4])
                 if record[3] < 16:
-                    if record[0] == 1:  # Older MacOS (use is discouraged)
-                        nameids[record[3]] = name.decode('utf-8')
-                    else:  # Microsoft and Unicode formats
+                    if record[0] in [0, 3]:  # Microsoft and Unicode formats
                         nameids[record[3]] = name.decode('utf-16be')
 
         return FontNames(*nameids)
@@ -528,7 +526,9 @@ def _build_fontlist():
         except ValueError:
             continue  # Unsupported Font
         family = f.info.names.family.lower()
-        subfamily = f.info.names.subfamily.lower().replace('book', 'regular')
+        subfamily = f.info.names.subfamily.lower()
+        subfamily = subfamily.replace('book', 'regular').replace('normal', 'regular')
+        subfamily = subfamily.replace('italique', 'italic').replace('gras', 'bold')
         findex[(family, subfamily)] = fname
     return findex
 
