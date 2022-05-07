@@ -56,7 +56,11 @@ class Gpos:
              str=None, lang: str=None) -> tuple[Optional[dict], Optional[dict]]:
         ''' Get kerning adjustmnet for glyph1 and glyph2 '''
         scr = self.scripts.get(script, self.scripts.get('DFLT', self.scripts.get('latn')))  # type: ignore
+        if scr is None:
+            return {}, {}
         langsys = scr.languages.get(lang, scr.languages.get('DFLT'))  # type: ignore
+        if langsys is None:
+            return {}, {}
 
         # Find kerning features in features list
         usefeatures = [self.features[i] for i in langsys.featureidxs]  # type: ignore
