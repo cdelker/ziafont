@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from .fonttypes import GlyphPath, GlyphComp, FontInfo, BBox, Xform
 
 DEFAULT_FONTSIZE = 48
-
+precision = 3
 
 def set_fontsize(size: int) -> None:
     ''' Set the default font size '''
@@ -20,6 +20,28 @@ def set_fontsize(size: int) -> None:
 def dflt_fontsize() -> float:
     ''' Get default fontsize '''
     return DEFAULT_FONTSIZE
+
+
+def set_precision(p: int) -> None:
+    ''' Set decimal precision for SVG coordinates. 
+
+        Note: trailing zeros are stripped, so the coordinates may be displayed
+        with lower precision than set, depending on precision defined in font.
+    '''
+    global precision
+    precision = int(p)
+
+
+def get_precision() -> int:
+    ''' Get decimal precision for SVG coordinates '''
+    return precision
+
+
+def fmt(f: float) -> str:
+    ''' String format, stripping trailing zeros '''
+    p = f'.{precision}f'
+    s = format(float(f), p)
+    return s.rstrip('0').rstrip('.')  # Strip trailing zeros
 
 
 def read_glyph(glyphid: int, font):
@@ -194,7 +216,7 @@ class SimpleGlyph:
         basename, _ = os.path.splitext(os.path.basename(self.font.info.filename))
         self.id = f'{basename}_{index}'
         self.emscale = self.dfltsize / self.font.info.layout.unitsperem
-        
+
     def _repr_svg_(self):
         return ET.tostring(self.svgxml(), encoding='unicode')
 
@@ -205,7 +227,7 @@ class SimpleGlyph:
         if self.font.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
-            elm.attrib['transform'] = f'translate({x} {y-yshift}) scale({fntscale})'
+            elm.attrib['transform'] = f'translate({fmt(x)} {fmt(y-yshift)}) scale({fmt(fntscale)})'
         else:
             elm = self.svgpath(x0=x, y0=y, scale=fntscale)
         return elm
@@ -246,32 +268,32 @@ class SimpleGlyph:
                 if ctrl[1]:
                     xim = (xx[0] + xx[1])/2
                     yim = (yy[0] + yy[1])/2
-                    path += f'M {xx[-1]} {yy[-1]} Q {xx[0]} {yy[0]} {xim} {yim}'
+                    path += f'M {fmt(xx[-1])} {fmt(yy[-1])} Q {fmt(xx[0])} {fmt(yy[0])} {fmt(xim)} {fmt(yim)}'
                 else:
-                    path += f'M {xx[-1]} {yy[-1]} Q {xx[0]} {yy[0]} {xx[1]} {yy[1]}'
+                    path += f'M {fmt(xx[-1])} {fmt(yy[-1])} Q {fmt(xx[0])} {fmt(yy[0])} {fmt(xx[1])} {fmt(yy[1])}'
             else:
-                path += f'M {xx[0]} {yy[0]} '
+                path += f'M {fmt(xx[0])} {fmt(yy[0])} '
 
             i = 1
             while i < npoints:
                 if ctrl[i]:
                     if i == npoints-1:
                         # Last point is control. End point wraps to start point
-                        path += f'Q {xx[i]} {yy[i]}, {xx[0]} {yy[0]} '
+                        path += f'Q {fmt(xx[i])} {fmt(yy[i])}, {fmt(xx[0])} {fmt(yy[0])} '
                         i += 1
                     elif ctrl[i+1]:
                         # Next point is also control.
                         # End of this bezier is implied between two controls
                         xim = (xx[i] + xx[i+1])/2
                         yim = (yy[i] + yy[i+1])/2
-                        path += f'Q {xx[i]} {yy[i]}, {xim} {yim} '
+                        path += f'Q {fmt(xx[i])} {fmt(yy[i])}, {fmt(xim)} {fmt(yim)} '
                         i += 1
                     else:
                         # Next point is real. It's the endpoint.
-                        path += f'Q {xx[i]} {yy[i]}, {xx[i+1]} {yy[i+1]} '
+                        path += f'Q {fmt(xx[i])} {fmt(yy[i])}, {fmt(xx[i+1])} {fmt(yy[i+1])} '
                         i += 2
                 else:
-                    path += f'L {xx[i]} {yy[i]} '
+                    path += f'L {fmt(xx[i])} {fmt(yy[i])} '
                     i += 1
 
             path += 'Z '
@@ -288,15 +310,16 @@ class SimpleGlyph:
 
         sym = ET.Element('symbol')
         sym.attrib['id'] = self.id
-        sym.attrib['width'] = str(width)
-        sym.attrib['height'] = str(height)
-        sym.attrib['viewBox'] = f'{xmin} {-ymax} {width} {height}'
+        sym.attrib['width'] = fmt(width)
+        sym.attrib['height'] = fmt(height)
+        sym.attrib['viewBox'] = f'{fmt(xmin)} {fmt(-ymax)} {fmt(width)} {fmt(height)}'
         sym.append(self.svgpath())
         return sym
 
     def svg(self, fontsize: float=None, svgver=2) -> str:
         ''' Get SVG as string '''
-        return ET.tostring(self.svgxml(fontsize, svgver=svgver), encoding='unicode')
+        return ET.tostring(self.svgxml(fontsize, svgver=svgver),
+                           encoding='unicode')
 
     def svgxml(self, fontsize: float=None, svgver=2) -> ET.Element:
         ''' Standalong SVG '''
@@ -317,20 +340,20 @@ class SimpleGlyph:
         scale = fontsize/self.dfltsize
 
         svg = ET.Element('svg')
-        svg.attrib['width'] = str(width)
-        svg.attrib['height'] = str(height)
+        svg.attrib['width'] = fmt(width)
+        svg.attrib['height'] = fmt(height)
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
         if not self.font.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
             elm = self.svgpath(x0=xmin, y0=base, scale=scale)
             svg.append(elm)
         else:
-            svg.attrib['viewBox'] = f'{xmin} 0 {width} {height}'
+            svg.attrib['viewBox'] = f'{fmt(xmin)} 0 {fmt(width)} {fmt(height)}'
             symbol = self.svgsymbol()
             svg.append(symbol)
             g = ET.SubElement(svg, 'use')
             g.attrib['href'] = f'#{self.id}'
-            g.attrib['transform'] = f'translate({xmin}, {base-ymax}) scale({scale})'
+            g.attrib['transform'] = f'translate({fmt(xmin)}, {fmt(base-ymax)}) scale({fmt(scale)})'
         return svg
 
     def test(self) -> 'TestGlyph':
@@ -396,41 +419,42 @@ class TestGlyph:
         width = xmax - xmin
         height = ymax - ymin
         base = ymax  # = height - ymin
+
         # Borders and baselines
         path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {xmin} {base} L {width} {base}'
+        path.attrib['d'] = f'M {fmt(xmin)} {fmt(base)} L {fmt(width)} {fmt(base)}'
         path.attrib['stroke'] = 'red'
 
         ascent = base - self.glyph.font.info.layout.ascent * scale
         descent = base - self.glyph.font.info.layout.descent * scale
         path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {xmin} {ascent} L {width} {ascent}'
+        path.attrib['d'] = f'M {fmt(xmin)} {fmt(ascent)} L {fmt(width)} {fmt(ascent)}'
         path.attrib['stroke'] = 'gray'
         path.attrib['stroke-dasharray'] = '2 2'
         path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {xmin} {descent} L {width} {descent}'
+        path.attrib['d'] = f'M {fmt(xmin)} {fmt(descent)} L {fmt(width)} {fmt(descent)}'
         path.attrib['stroke'] = 'gray'
         path.attrib['stroke-dasharray'] = '2 2'
         rect = ET.SubElement(svg, 'rect')
         rect.attrib['x'] = '0'
         rect.attrib['y'] = '0'
-        rect.attrib['width'] = str(xmax)
-        rect.attrib['height'] = str(height)
+        rect.attrib['width'] = fmt(xmax)
+        rect.attrib['height'] = fmt(height)
         rect.attrib['fill'] = 'none'
         rect.attrib['stroke'] = 'blue'
         rect.attrib['stroke-dasharray'] = '2 2'
         circ = ET.SubElement(svg, 'circle')
         circ.attrib['cx'] = '0'
-        circ.attrib['cy'] = str(base)
+        circ.attrib['cy'] = fmt(base)
         circ.attrib['r'] = '3'
         circ.attrib['fill'] = 'red'
 
         # Dots defining <path>
         for x, y, c in zip(self.glyph.path.xvals, self.glyph.path.yvals, self.glyph.path.ctvals):
             circ = ET.SubElement(svg, 'circle')
-            circ.attrib['cx'] = str(x * scale)
-            circ.attrib['cy'] = str(base - y * scale)
-            circ.attrib['r'] = f'{fontsize*scale/3}'
+            circ.attrib['cx'] = fmt(x * scale)
+            circ.attrib['cy'] = fmt(base - y * scale)
+            circ.attrib['r'] = f'{fmt(fontsize*scale/3)}'
             circ.attrib['fill'] = 'none' if c else 'blue'
             circ.attrib['stroke'] = 'blue'
             circ.attrib['opacity'] = '0.3'

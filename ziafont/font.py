@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from .fontread import FontReader
 from . import gpos
 from .cmap import Cmap12, Cmap4
-from .glyph import read_glyph, dflt_fontsize, SimpleGlyph, CompoundGlyph
+from .glyph import read_glyph, dflt_fontsize, fmt, SimpleGlyph, CompoundGlyph
 from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames
 
 
@@ -411,9 +411,9 @@ class Text:
         if ymin > xy[1]:
             h = ymin + h - xy[1]
             ymin = xy[1]
-        svg.attrib['width'] = str(w)
-        svg.attrib['height'] = str(h)
-        svg.attrib['viewBox'] = f'{xmin} {ymin} {w} {h}'
+        svg.attrib['width'] = fmt(w)
+        svg.attrib['height'] = fmt(h)
+        svg.attrib['viewBox'] = f'{fmt(xmin)} {fmt(ymin)} {fmt(w)} {fmt(h)}'
 
         # Get existing symbol/glyphs, add ones not there yet
         if self.svg2:
@@ -423,21 +423,21 @@ class Text:
                 if sym not in symids:
                     svg.append(sym)
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({xy[0]} {xy[1]+self.linespacing*self.size})'
+            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1]+self.linespacing*self.size)})'
 
         svg.append(word)
 
         if DEBUG:  # Test viewbox
             rect = ET.SubElement(svg, 'rect')
-            rect.attrib['x'] = f'{xy[0]}'
-            rect.attrib['y'] = f'{xy[1]}'
-            rect.attrib['width'] = str(width)
-            rect.attrib['height'] = str(height)
+            rect.attrib['x'] = f'{fmt(xy[0])}'
+            rect.attrib['y'] = f'{fmt(xy[1])}'
+            rect.attrib['width'] = fmt(width)
+            rect.attrib['height'] = fmt(height)
             rect.attrib['fill'] = 'none'
             rect.attrib['stroke'] = 'red'
             circ = ET.SubElement(svg, 'circle')
-            circ.attrib['cx'] = f'{xyorig[0]}'
-            circ.attrib['cy'] = f'{xyorig[1]}'
+            circ.attrib['cx'] = f'{fmt(xyorig[0])}'
+            circ.attrib['cy'] = f'{fmt(xyorig[1])}'
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
