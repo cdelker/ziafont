@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Literal, Sequence, Union, Optional
 import sys
 import os
+import math
 from pathlib import Path
 from collections import namedtuple
 import importlib.resources as pkg_resources
@@ -384,7 +385,7 @@ class Text:
 
     def drawon(self, svg: ET.Element, x: float=0, y: float=0):
         ''' Draw text on the SVG '''
-        word, symbols, width, height = self._buildstring()
+        word, symbols, width, height, ymin, ymax = self._buildstring()
 
         xyorig = x, y
         # Adjust vertical alignment
@@ -457,7 +458,7 @@ class Text:
         symbols: list[ET.Element] = []  # <symbol> elements
         linewidths: list[float] = []
         allglyphs = []  # (glyph, x) where x is left aligned
-        for line in lines:
+        for lineidx, line in enumerate(lines):
             lineglyphs = []
             glyphs = [self.font.glyph(c) for c in line]
             x = 0
@@ -468,7 +469,7 @@ class Text:
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
                 xadvance = glyph.advance(nextglyph, kern=self.kern)
                 x += (xadvance - min(0, glyph.path.bbox.xmin)) * scale
-
+                
             if glyph.path.bbox.xmax > xadvance:
                 # Make a bit wider to grab right edge that extends beyond advance width
                 x += (glyph.path.bbox.xmax - xadvance) * scale
@@ -479,6 +480,8 @@ class Text:
         word = ET.Element('g')
         word.attrib['word'] = self.str  # Just an identifier for debugging
         totwidth = max(linewidths)
+        ymin = math.inf
+        ymax = -math.inf
         for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
             if self.halign == 'center':
                 leftshift = (totwidth - linewidth)/2
@@ -488,20 +491,23 @@ class Text:
                 leftshift = 0
             for glyph, x in lineglyphs:
                 word.append(glyph.place(x+leftshift, yvals[lineidx], self.size))
+                ymax = max(ymax, glyph.path.bbox.ymax*scale+yvals[lineidx])
+                ymin = min(ymin, glyph.path.bbox.ymin*scale+yvals[lineidx])
+
         if not self.svg2:
             symbols = []
-        return word, symbols, totwidth, height
+        return word, symbols, totwidth, height, ymin, ymax
 
     def getsize(self) -> tuple[float, float]:
         ''' Calculate width and height (including ascent/descent) of string '''
-        _, _, width, height = self._buildstring()
-        return width, height
+        _, _, width, height, ymin, ymax = self._buildstring()
+        return width, ymax-ymin
 
     def getyofst(self) -> float:
         ''' Y-shift from bottom of bbox to 0 '''
         return 0
 
-
+            
 def _build_fontlist():
     ''' Generate list of system fonts locations and their names '''
     if sys.platform.startswith('win'):
