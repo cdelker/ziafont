@@ -373,7 +373,27 @@ class Text:
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
         if self.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
-        return self.drawon(svg)
+        ret, (x1, x2, y1, y2) = self._drawon(svg)
+        
+        # Expand SVG viewbox to fit
+        try:
+            xmin, ymin, w, h = [float(f) for f in svg.attrib['viewBox'].split()]
+        except KeyError:
+            xmin = ymin = w = h = 0
+        if xmin + w < x2:
+            w = x2 - xmin
+        if ymin + h < y2:
+            h = y2 - y1
+        if xmin > x1:
+            w = xmin + w - x1
+            xmin = x1
+        if ymin > y1:
+            h = ymin + h - y1
+            ymin = y1
+        svg.attrib['width'] = fmt(w)
+        svg.attrib['height'] = fmt(h)
+        svg.attrib['viewBox'] = f'{fmt(xmin)} {fmt(ymin)} {fmt(w)} {fmt(h)}'
+        return ret
 
     def svg(self) -> str:
         ''' Get SVG string '''
@@ -385,36 +405,22 @@ class Text:
 
     def drawon(self, svg: ET.Element, x: float=0, y: float=0):
         ''' Draw text on the SVG '''
+        svg, _ = self._drawon(svg, x, y)
+        return svg
+
+    def _drawon(self, svg: ET.Element, x: float=0, y: float=0):
+        ''' Draw text on the SVG '''
         word, symbols, width, height, ymin, ymax = self._buildstring()
 
         xyorig = x, y
         # Adjust vertical alignment
-        yofst = {'base': -self.linespacing*self.size,
+        yofst = {'base': -self.size,
                  'bottom': -height,
                  'top': 0,
                  'center': -height/2}.get(self.valign, 0)
         xofst = {'center': -width/2,
                  'right': -width}.get(self.halign, 0)
         xy = x + xofst, y + yofst
-
-        # Expand SVG viewbox to fit
-        try:
-            xmin, ymin, w, h = [float(f) for f in svg.attrib['viewBox'].split()]
-        except KeyError:
-            xmin = ymin = w = h = 0
-        if xmin + w < xy[0] + width:
-            w = xy[0] + width - xmin
-        if ymin + h < xy[1] + height:
-            h = xy[1] + height - ymin
-        if xmin > xy[0]:
-            w = xmin + w - xy[0]
-            xmin = xy[0]
-        if ymin > xy[1]:
-            h = ymin + h - xy[1]
-            ymin = xy[1]
-        svg.attrib['width'] = fmt(w)
-        svg.attrib['height'] = fmt(h)
-        svg.attrib['viewBox'] = f'{fmt(xmin)} {fmt(ymin)} {fmt(w)} {fmt(h)}'
 
         # Get existing symbol/glyphs, add ones not there yet
         if self.svg2:
@@ -424,7 +430,7 @@ class Text:
                 if sym not in symids:
                     svg.append(sym)
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1]+self.linespacing*self.size)})'
+            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1]+self.size)})'
 
         svg.append(word)
 
@@ -442,7 +448,7 @@ class Text:
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
-        return svg
+        return svg, (xy[0], xy[0]+width, xy[1], xy[1]+height)
 
     def _buildstring(self) -> tuple[ET.Element, list[ET.Element], float, float]:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
