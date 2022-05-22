@@ -21,6 +21,8 @@ DEBUG = False
 
 fontindex = None
 
+Symbols = namedtuple('Symbols', ['word', 'symbols', 'width', 'ymin', 'ymax'])
+
 
 class Font:
     ''' Class to read/parse a OpenType/TTF and write glyphs to SVG
@@ -39,7 +41,7 @@ class Font:
             self.fname = findfont(name, style)
         
         if self.fname is None:
-            with pkg_resources.path('ziafont.fonts', 'Lato-Regular.ttf') as p:
+            with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
 
         with open(self.fname, 'rb') as f:
@@ -366,6 +368,7 @@ class Text:
             self.font = Font(font)
         else:
             self.font = font
+        self._symbols = self._buildstring()
 
     def svgxml(self) -> ET.Element:
         ''' Get SVG XML element '''
@@ -373,23 +376,9 @@ class Text:
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
         if self.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
-        ret, (x1, x2, y1, y2) = self._drawon(svg)
-        
-        # Expand SVG viewbox to fit
-        try:
-            xmin, ymin, w, h = [float(f) for f in svg.attrib['viewBox'].split()]
-        except KeyError:
-            xmin = ymin = w = h = 0
-        if xmin + w < x2:
-            w = x2 - xmin
-        if ymin + h < y2:
-            h = y2 - y1
-        if xmin > x1:
-            w = xmin + w - x1
-            xmin = x1
-        if ymin > y1:
-            h = ymin + h - y1
-            ymin = y1
+        ret, (xmin, xmax, ymin, ymax) = self._drawon(svg)
+        w = xmax-xmin
+        h = ymax-ymin
         svg.attrib['width'] = fmt(w)
         svg.attrib['height'] = fmt(h)
         svg.attrib['viewBox'] = f'{fmt(xmin)} {fmt(ymin)} {fmt(w)} {fmt(h)}'
@@ -410,14 +399,14 @@ class Text:
 
     def _drawon(self, svg: ET.Element, x: float=0, y: float=0):
         ''' Draw text on the SVG '''
-        word, symbols, width, height, ymin, ymax = self._buildstring()
-
+        word, symbols, width, ymin, ymax = self._symbols
+        height = ymax-ymin
         xyorig = x, y
         # Adjust vertical alignment
-        yofst = {'base': -self.size,
-                 'bottom': -height,
-                 'top': 0,
-                 'center': -height/2}.get(self.valign, 0)
+        yofst = {'base': 0,
+                 'bottom': -ymax,
+                 'top': -ymin,
+                 'center': -height/2-ymin}.get(self.valign, 0)
         xofst = {'center': -width/2,
                  'right': -width}.get(self.halign, 0)
         xy = x + xofst, y + yofst
@@ -430,14 +419,14 @@ class Text:
                 if sym not in symids:
                     svg.append(sym)
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1]+self.size)})'
+            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1])})'
 
         svg.append(word)
 
         if DEBUG:  # Test viewbox
             rect = ET.SubElement(svg, 'rect')
-            rect.attrib['x'] = f'{fmt(xy[0])}'
-            rect.attrib['y'] = f'{fmt(xy[1])}'
+            rect.attrib['x'] = fmt(xy[0])
+            rect.attrib['y'] = fmt(xy[1]+ymin)
             rect.attrib['width'] = fmt(width)
             rect.attrib['height'] = fmt(height)
             rect.attrib['fill'] = 'none'
@@ -448,17 +437,14 @@ class Text:
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
-        return svg, (xy[0], xy[0]+width, xy[1], xy[1]+height)
+        return svg, (xy[0], xy[0]+width, ymin, ymax)
 
     def _buildstring(self) -> tuple[ET.Element, list[ET.Element], float, float]:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
         scale = self.size / self.font.info.layout.unitsperem
-        fontheight = (self.font.info.layout.ymax - self.font.info.layout.ymin) * scale
-        lineheight = fontheight * self.linespacing
-
+        lineheight = self.size * self.linespacing
         lines = self.str.splitlines()
         yvals = [i*lineheight for i in range(len(lines))]  # valign == 'base'
-        height = yvals[-1] + fontheight
 
         # Generate symbols and calculate x positions using left alignment
         symbols: list[ET.Element] = []  # <symbol> elements
@@ -486,8 +472,6 @@ class Text:
         word = ET.Element('g')
         word.attrib['word'] = self.str  # Just an identifier for debugging
         totwidth = max(linewidths)
-        ymin = math.inf
-        ymax = -math.inf
         for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
             if self.halign == 'center':
                 leftshift = (totwidth - linewidth)/2
@@ -497,21 +481,21 @@ class Text:
                 leftshift = 0
             for glyph, x in lineglyphs:
                 word.append(glyph.place(x+leftshift, yvals[lineidx], self.size))
-                ymax = max(ymax, glyph.path.bbox.ymax*scale+yvals[lineidx])
-                ymin = min(ymin, glyph.path.bbox.ymin*scale+yvals[lineidx])
+
+        ymin = yvals[0] - self.font.info.layout.ascent*scale
+        ymax = yvals[-1] - self.font.info.layout.descent*scale 
 
         if not self.svg2:
             symbols = []
-        return word, symbols, totwidth, height, ymin, ymax
+        return Symbols(word, symbols, totwidth, ymin, ymax)
 
     def getsize(self) -> tuple[float, float]:
         ''' Calculate width and height (including ascent/descent) of string '''
-        _, _, width, height, ymin, ymax = self._buildstring()
-        return width, ymax-ymin
+        return self._symbols.width, self._symbols.ymax-self._symbols.ymin
 
     def getyofst(self) -> float:
         ''' Y-shift from bottom of bbox to 0 '''
-        return 0
+        return -self._symbols.ymax
 
             
 def _build_fontlist():
