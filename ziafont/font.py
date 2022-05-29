@@ -1,10 +1,9 @@
 ''' Read font file and write glyphs to SVG '''
 
 from __future__ import annotations
-from typing import Literal, Sequence, Union, Optional
+from typing import Literal, Sequence, Union, Optional, Dict
 import sys
 import os
-import math
 from pathlib import Path
 from collections import namedtuple
 import importlib.resources as pkg_resources
@@ -39,7 +38,7 @@ class Font:
             self.fname = Path(name)
         elif name:
             self.fname = findfont(name, style)
-        
+
         if self.fname is None:
             with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
@@ -48,6 +47,8 @@ class Font:
             self.fontfile = FontReader(f.read())
         self.info = self._loadfont()  # Load in all the font metadata
         self.svg2 = svg2
+        self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
+        self._glyphids: Dict[str, int] = {}
 
     def _loadfont(self) -> FontInfo:
         ''' Read font metadata '''
@@ -78,14 +79,17 @@ class Font:
         for i in range(numtables):
             tag = self.fontfile.read(4).decode()
             self.tables[tag] = Table(checksum=self.fontfile.readuint32(),
-                                offset=self.fontfile.readuint32(),
-                                length=self.fontfile.readuint32())
-        for table in self.tables.keys():
-            if table != 'head':
-                self._verifychecksum(table)
+                                     offset=self.fontfile.readuint32(),
+                                     length=self.fontfile.readuint32())
 
         if 'glyf' not in self.tables:
             raise ValueError('Unsupported font (no glyf table).')
+
+    def verifychecksum(self):
+        ''' Verify checksum of all font tables. Raises ValueError if invalid '''
+        for table in self.tables.keys():
+            if table != 'head':
+                self._verifychecksum(table)
 
     def _verifychecksum(self, table: str) -> None:
         ''' Verify checksum of table. Raises ValueError if invalid. '''
@@ -93,9 +97,7 @@ class Font:
         self.fontfile.seek(tb.offset)
         s = 0
         nlongs = (tb.length + 3) // 4
-        for i in range(nlongs):
-            s = ((s + self.fontfile.readuint32()) % 0x100000000)
-
+        s = sum(self.fontfile.readuint32() for i in range(nlongs)) & 0xffffffff
         if s != tb.checksum:
             raise ValueError(f'Table {table} checksum {s} != saved checksum {tb.checksum}')
 
@@ -265,7 +267,11 @@ class Font:
 
     def glyphindex(self, char: str) -> int:
         ''' Get index of character glyph '''
-        return self.cmap.glyphid(char)  # type: ignore
+        gid = self._glyphids.get(char)
+        if gid is None:
+            gid = self.cmap.glyphid(char)  # type: ignore
+            self._glyphids[char] = gid
+        return gid
 
     def _glyphoffset(self, index: int) -> Optional[int]:
         ''' Get offset (from beginning of file) of glyph,
@@ -295,7 +301,11 @@ class Font:
             Args:
                 glyphid: Glyph index used to find glyph data
         '''
-        return read_glyph(glyphid, self)
+        glyph = self._glyphs.get(glyphid)
+        if glyph is None:
+            glyph = read_glyph(glyphid, self)
+            self._glyphs[glyphid] = glyph
+        return glyph
 
     def advance(self, glyph1: int, glyph2: int=None, kern: bool=True):
         ''' Get advance width in font units, including kerning adjustment if glyph2 is defined '''
@@ -318,7 +328,7 @@ class Font:
                 halign: Literal['left', 'center', 'right']='left',
                 valign: Literal['base', 'center', 'top']='base',
                 canvas: ET.Element=None,
-                xy: Sequence[float]=(0,0),
+                xy: Sequence[float]=(0, 0),
                 kern=True):
         ''' Convert a string to SVG
 
@@ -439,7 +449,7 @@ class Text:
             circ.attrib['stroke'] = 'red'
         return svg, (xy[0], xy[0]+width, ymin, ymax)
 
-    def _buildstring(self) -> tuple[ET.Element, list[ET.Element], float, float]:
+    def _buildstring(self) -> Symbols:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
         scale = self.size / self.font.info.layout.unitsperem
         lineheight = self.size * self.linespacing
@@ -461,7 +471,7 @@ class Text:
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
                 xadvance = glyph.advance(nextglyph, kern=self.kern)
                 x += (xadvance - min(0, glyph.path.bbox.xmin)) * scale
-                
+
             if glyph.path.bbox.xmax > xadvance:
                 # Make a bit wider to grab right edge that extends beyond advance width
                 x += (glyph.path.bbox.xmax - xadvance) * scale
@@ -483,7 +493,7 @@ class Text:
                 word.append(glyph.place(x+leftshift, yvals[lineidx], self.size))
 
         ymin = yvals[0] - self.font.info.layout.ascent*scale
-        ymax = yvals[-1] - self.font.info.layout.descent*scale 
+        ymax = yvals[-1] - self.font.info.layout.descent*scale
 
         if not self.svg2:
             symbols = []
@@ -497,7 +507,7 @@ class Text:
         ''' Y-shift from bottom of bbox to 0 '''
         return -self._symbols.ymax
 
-            
+
 def _build_fontlist():
     ''' Generate list of system fonts locations and their names '''
     if sys.platform.startswith('win'):

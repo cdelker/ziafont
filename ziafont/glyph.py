@@ -6,10 +6,11 @@ from typing import Union
 import os
 import xml.etree.ElementTree as ET
 
-from .fonttypes import GlyphPath, GlyphComp, FontInfo, BBox, Xform
+from .fonttypes import GlyphPath, GlyphComp, BBox, Xform
 
 DEFAULT_FONTSIZE = 48
 precision = 3
+
 
 def set_fontsize(size: int) -> None:
     ''' Set the default font size '''
@@ -23,7 +24,7 @@ def dflt_fontsize() -> float:
 
 
 def set_precision(p: int) -> None:
-    ''' Set decimal precision for SVG coordinates. 
+    ''' Set decimal precision for SVG coordinates.
 
         Note: trailing zeros are stripped, so the coordinates may be displayed
         with lower precision than set, depending on precision defined in font.
@@ -47,8 +48,7 @@ def fmt(f: float) -> str:
 def read_glyph(glyphid: int, font):
     ''' Read a glyph from the glyf table. '''
     offset = font._glyphoffset(glyphid)
-    
-    
+
     if offset is None:
         return EmptyGlyph(glyphid, font)
 
@@ -59,7 +59,7 @@ def read_glyph(glyphid: int, font):
     assert offset < font.tables['glyf'].offset + font.tables['glyf'].length
 
     font.fontfile.seek(offset)
-    
+
     numcontours = font.fontfile.readint16()
     xmin = font.fontfile.readint16()
     ymin = font.fontfile.readint16()
@@ -135,7 +135,7 @@ def read_simpleglyph(font, index, numcontours, charbox):
     glyph = SimpleGlyph(index, path, font)
     return glyph
 
-    
+
 def read_compoundglyph(font, index, charbox):
     ''' Read compound glyph from the fontfile. Assumes filepointer is set '''
     fontfile = font.fontfile
@@ -231,19 +231,16 @@ class SimpleGlyph:
         else:
             elm = self.svgpath(x0=x, y0=y, scale=fntscale)
         return elm
-    
+
     def advance(self, nextchr=None, kern=True):
         ''' Get advance width in glyph units, including kerning if nextchr is defined '''
         if nextchr:
             nextchr = nextchr.index
         return self.font.advance(self.index, nextchr, kern=kern)
-    
+
     def svgpath(self, x0=0, y0=0, scale=1) -> ET.Element:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
         emscale = self.emscale * scale
-        height = (self.font.info.layout.ymax - self.font.info.layout.ymin) * emscale
-        base = height + self.font.info.layout.ymin*emscale
-
         # Split the contours
         xconts = []
         yconts = []
@@ -331,7 +328,7 @@ class SimpleGlyph:
         xmin = min(self.path.bbox.xmin * scale, 0)
         xmax = self.path.bbox.xmax * scale
         ymin = min(self.path.bbox.ymin, self.font.info.layout.ymin) * scale
-        
+
         # ymax can go above font's ymax for extended (ie math) glyphs
         ymax = max(self.path.bbox.ymax, self.font.info.layout.ymax) * scale
         width = xmax - xmin
