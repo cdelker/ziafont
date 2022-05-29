@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name = 'ziafont',
-    version = '0.3',
+    version = '0.3.1',
     description = 'Convert TTF/OTF font glyphs to SVG paths',
     author = 'Collin J. Delker',
     author_email = 'ziaplot@collindelker.com',
@@ -17,7 +17,8 @@ setuptools.setup(
     },
     python_requires='>=3.8',
     packages=setuptools.find_packages(),
-    package_data = {'ziafont': ['py.typed']},
+    package_data = {'ziafont': ['py.typed'],
+                    'ziafont.fonts': ['DejaVuSans.ttf']},
     zip_safe=False,
     keywords = ['font', 'truetype', 'opentype', 'svg'],
     install_requires=[],
