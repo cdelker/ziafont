@@ -7,40 +7,12 @@ import os
 import xml.etree.ElementTree as ET
 
 from .fonttypes import GlyphPath, GlyphComp, BBox, Xform
-
-DEFAULT_FONTSIZE = 48
-precision = 3
-
-
-def set_fontsize(size: int) -> None:
-    ''' Set the default font size '''
-    global DEFAULT_FONTSIZE
-    DEFAULT_FONTSIZE = size
-
-
-def dflt_fontsize() -> float:
-    ''' Get default fontsize '''
-    return DEFAULT_FONTSIZE
-
-
-def set_precision(p: int) -> None:
-    ''' Set decimal precision for SVG coordinates.
-
-        Note: trailing zeros are stripped, so the coordinates may be displayed
-        with lower precision than set, depending on precision defined in font.
-    '''
-    global precision
-    precision = int(p)
-
-
-def get_precision() -> int:
-    ''' Get decimal precision for SVG coordinates '''
-    return precision
+from .config import config
 
 
 def fmt(f: float) -> str:
     ''' String format, stripping trailing zeros '''
-    p = f'.{precision}f'
+    p = f'.{config.precision}f'
     s = format(float(f), p)
     return s.rstrip('0').rstrip('.')  # Strip trailing zeros
 
@@ -224,7 +196,7 @@ class SimpleGlyph:
         ''' Get <use> svg tag translated/scaled to the right position '''
         fntscale = (fontsize/self.dfltsize)
         yshift = self.font.info.layout.ymax * self.emscale * fntscale
-        if self.font.svg2:
+        if config.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
             elm.attrib['transform'] = f'translate({fmt(x)} {fmt(y-yshift)}) scale({fmt(fntscale)})'
@@ -320,7 +292,7 @@ class SimpleGlyph:
 
     def svgxml(self, fontsize: float=None, svgver=2) -> ET.Element:
         ''' Standalong SVG '''
-        fontsize = fontsize if fontsize else DEFAULT_FONTSIZE
+        fontsize = fontsize if fontsize else config.fontsize
         scale = fontsize / self.font.info.layout.unitsperem
 
         # Width varies by character, but height is constant for the whole font
@@ -340,7 +312,7 @@ class SimpleGlyph:
         svg.attrib['width'] = fmt(width)
         svg.attrib['height'] = fmt(height)
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
-        if not self.font.svg2:
+        if not config.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
             elm = self.svgpath(x0=xmin, y0=base, scale=scale)
             svg.append(elm)
@@ -406,7 +378,7 @@ class TestGlyph:
 
     def svgxml(self, fontsize: float=None) -> ET.Element:
         ''' Glyph svg as XML element tree '''
-        fontsize = fontsize if fontsize else DEFAULT_FONTSIZE
+        fontsize = fontsize if fontsize else config.fontsize
         svg = self.glyph.svgxml(fontsize)
         scale = fontsize / self.glyph.font.info.layout.unitsperem
         xmin = min(self.glyph.path.bbox.xmin * scale, 0)

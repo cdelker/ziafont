@@ -9,18 +9,15 @@ from collections import namedtuple
 import importlib.resources as pkg_resources
 import xml.etree.ElementTree as ET
 
+from .config import config
 from .fontread import FontReader
 from . import gpos
 from .cmap import Cmap12, Cmap4
-from .glyph import read_glyph, dflt_fontsize, fmt, SimpleGlyph, CompoundGlyph
-from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames
+from .glyph import read_glyph, fmt, SimpleGlyph, CompoundGlyph
+from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols
 
-
-DEBUG = False
 
 fontindex = None
-
-Symbols = namedtuple('Symbols', ['word', 'symbols', 'width', 'ymin', 'ymax'])
 
 
 class Font:
@@ -30,9 +27,8 @@ class Font:
             name: File name of the font
             style: Font style such as "bold" or "italic", used when searching
                 system paths for a font file
-            svg2: Use SVG Version 2.0. Disable for better compatibility.
     '''
-    def __init__(self, name: Union[str, Path]=None, style: str='regular', svg2: bool=True):
+    def __init__(self, name: Union[str, Path]=None, style: str='regular'):
         self.fname = None
         if name and Path(name).exists():
             self.fname = Path(name)
@@ -46,7 +42,6 @@ class Font:
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
         self.info = self._loadfont()  # Load in all the font metadata
-        self.svg2 = svg2
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
         self._glyphids: Dict[str, int] = {}
 
@@ -342,7 +337,7 @@ class Font:
                 xy: Position to draw on canvas
                 kern: Use font kerning adjustment
         '''
-        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern, svg2=self.svg2)
+        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern)
         if canvas is not None:
             txt.drawon(canvas, xy[0], xy[1])
         return txt
@@ -359,20 +354,17 @@ class Text:
             halign: Horizontal Alignment
             valign: Vertical Alignment
             kern: Use kerning adjustment
-            svg2: Use SVG Version 2.0. Disable for better compatibility.
     '''
     def __init__(self, s: str,  font: Union[str, Font]=None,
                  size: float=None, linespacing: float=1,
                  halign: Literal['left', 'center', 'right']='left',
                  valign: Literal['base', 'center', 'top']='base',
-                 kern: bool=True,
-                 svg2: bool=True):
+                 kern: bool=True):
         self.str = s
         self.halign = halign
         self.valign = valign
-        self.size = size if size else dflt_fontsize()
+        self.size = size if size else config.fontsize
         self.linespacing = linespacing
-        self.svg2 = svg2
         self.kern = kern
         if font is None or isinstance(font, str):
             self.font = Font(font)
@@ -384,7 +376,7 @@ class Text:
         ''' Get SVG XML element '''
         svg = ET.Element('svg')
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
-        if self.svg2:
+        if config.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
         ret, (xmin, xmax, ymin, ymax) = self._drawon(svg)
         w = xmax-xmin
@@ -422,7 +414,7 @@ class Text:
         xy = x + xofst, y + yofst
 
         # Get existing symbol/glyphs, add ones not there yet
-        if self.svg2:
+        if config.svg2:
             existingsymbols = svg.findall('symbol')
             symids = [sym.attrib.get('id') for sym in existingsymbols]
             for sym in symbols:
@@ -433,7 +425,7 @@ class Text:
 
         svg.append(word)
 
-        if DEBUG:  # Test viewbox
+        if config.debug:  # Test viewbox
             rect = ET.SubElement(svg, 'rect')
             rect.attrib['x'] = fmt(xy[0])
             rect.attrib['y'] = fmt(xy[1]+ymin)
@@ -495,7 +487,7 @@ class Text:
         ymin = yvals[0] - self.font.info.layout.ascent*scale
         ymax = yvals[-1] - self.font.info.layout.descent*scale
 
-        if not self.svg2:
+        if not config.svg2:
             symbols = []
         return Symbols(word, symbols, totwidth, ymin, ymax)
 
@@ -544,6 +536,9 @@ def _build_fontlist():
 
 def findfont(name, style='Regular'):
     ''' Find a font file by name '''
+    if name is None:
+        return None
+
     if Path(name).exists():
         return Path(name)
 

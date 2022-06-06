@@ -13,3 +13,5 @@ API
 
 .. autoclass:: ziafont.glyph.CompoundGlyph
     :members:
+
+.. autoclass:: ziafont.config.Config

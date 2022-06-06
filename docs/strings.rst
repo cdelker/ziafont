@@ -107,13 +107,59 @@ The method :py:meth:`ziafont.font.Font.getsize` can be used to calculate the pix
 
 |
 
+Configuration Options
+---------------------
+
+The `ziafont.config` object provides some global configuration options.
+
+|
+
 SVG Version Compatibility
--------------------------
+*************************
 
 Some SVG renderers, including recent versions of Inkscape and some OS built-in image viewers, are not fully compatible with the SVG 2.0 specification.
-Set the `svg2` Font parameter to `False` for better compatibility. This may result in larger file sizes
+Set the `svg2` configuration parameter to `False` for better compatibility. This may result in larger file sizes
 as each glyph is included as its own <path> element rather than being reused with <symbol> and <use> elements.
 
 .. code-block:: python
 
-    font = zf.Font('NotoSerif-Regular.ttf', svg2=False)
+    ziafont.config.svg2 = False
+
+|
+
+Default Font Size
+*****************
+
+The default font size can be specified with:
+
+.. code-block:: python
+
+    ziafont.config.fontsize = 36
+
+|
+
+SVG decimal precision
+*********************
+
+The decimal precision of coordinates in SVG tags can be set using `ziafont.config.precision`.
+Lower precision saves space in the SVG string, but may reduce quality of the image.
+
+.. jupyter-execute::
+
+    ziafont.config.precision = 6
+    # ...
+
+.. jupyter-execute::
+    :hide-code:
+
+    print('...', ziafont.Text('A').svg()[252:326])
+
+.. jupyter-execute::
+
+    ziafont.config.precision = 2
+    # ...
+
+.. jupyter-execute::
+    :hide-code:
+
+    print('...', ziafont.Text('A').svg()[228:276])
