@@ -4,10 +4,12 @@ from __future__ import annotations
 from typing import Literal, Sequence, Union, Optional, Dict
 import sys
 import os
+import math
 from pathlib import Path
 from collections import namedtuple
 import importlib.resources as pkg_resources
 import xml.etree.ElementTree as ET
+import warnings
 
 from .config import config
 from .fontread import FontReader
@@ -34,7 +36,9 @@ class Font:
             self.fname = Path(name)
         elif name:
             self.fname = findfont(name, style)
-
+            if self.fname is None:
+                warnings.warn(f'Font {name} not found.')
+            
         if self.fname is None:
             with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
@@ -324,6 +328,7 @@ class Font:
                 valign: Literal['base', 'center', 'top']='base',
                 canvas: ET.Element=None,
                 xy: Sequence[float]=(0, 0),
+                rotation: float=0, rotation_mode: str='anchor',
                 kern=True):
         ''' Convert a string to SVG
 
@@ -335,16 +340,20 @@ class Font:
                 valign: Vertical Alignment
                 canvas: SVG XML element to draw on
                 xy: Position to draw on canvas
+                rotation: Rotation angle in degrees
+                rotation_mode: Either 'default' or 'anchor', to
+                    mimic Matplotlib behavoir. See:
+                    https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
                 kern: Use font kerning adjustment
         '''
-        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern)
+        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern, rotation=rotation, rotation_mode=rotation_mode)
         if canvas is not None:
             txt.drawon(canvas, xy[0], xy[1])
         return txt
 
 
 class Text:
-    ''' Convert XML Element to SVG text with Jupyter representer.
+    ''' Draw text as SVG paths
 
         Args:
             s: String to draw
@@ -353,16 +362,24 @@ class Text:
             linespacing: Spacing between lines
             halign: Horizontal Alignment
             valign: Vertical Alignment
+            rotation: Rotation angle in degrees
+            rotation_mode: Either 'default' or 'anchor', to
+                mimic Matplotlib behavoir. See:
+                https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
             kern: Use kerning adjustment
     '''
     def __init__(self, s: str,  font: Union[str, Font]=None,
                  size: float=None, linespacing: float=1,
                  halign: Literal['left', 'center', 'right']='left',
                  valign: Literal['base', 'center', 'top']='base',
+                 rotation: float=0,
+                 rotation_mode: str='anchor',
                  kern: bool=True):
         self.str = s
         self.halign = halign
         self.valign = valign
+        self.rotation = rotation
+        self.rotation_mode = rotation_mode
         self.size = size if size else config.fontsize
         self.linespacing = linespacing
         self.kern = kern
@@ -420,26 +437,73 @@ class Text:
             for sym in symbols:
                 if sym not in symids:
                     svg.append(sym)
+
+        xform = ''
         if xy != (0, 0):
-            word.attrib['transform'] = f'translate({fmt(xy[0])} {fmt(xy[1])})'
+            xform = f'translate({fmt(xy[0])} {fmt(xy[1])})'
 
         svg.append(word)
 
         if config.debug:  # Test viewbox
-            rect = ET.SubElement(svg, 'rect')
-            rect.attrib['x'] = fmt(xy[0])
-            rect.attrib['y'] = fmt(xy[1]+ymin)
+            rect = ET.SubElement(word, 'rect')
+            rect.attrib['x'] = '0'
+            rect.attrib['y'] = fmt(ymin)
             rect.attrib['width'] = fmt(width)
             rect.attrib['height'] = fmt(height)
             rect.attrib['fill'] = 'none'
             rect.attrib['stroke'] = 'red'
-            circ = ET.SubElement(svg, 'circle')
-            circ.attrib['cx'] = f'{fmt(xyorig[0])}'
-            circ.attrib['cy'] = f'{fmt(xyorig[1])}'
+            circ = ET.SubElement(word, 'circle')
+            circ.attrib['cx'] = fmt(-xofst)#'0'#fmt(xy[0])
+            circ.attrib['cy'] = fmt(-yofst)#'0'#fmt(xy[1])
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
-        return svg, (xy[0], xy[0]+width, ymin, ymax)
+        bbox = (xy[0], xy[0]+width, xy[1]+ymin, xy[1]+ymax)
+
+        if self.rotation:
+            centerx = xy[0]  # Center of rotation
+            centery = xy[1]
+            costh = math.cos(math.radians(self.rotation))
+            sinth = math.sin(math.radians(self.rotation))
+            p1 = (xofst, ymin+yofst)  # Corners relative to rotation point
+            p2 = (xofst+width, ymin+yofst)
+            p3 = (xofst+width, ymax+yofst)
+            p4 = (xofst, ymax+yofst)
+            x1 = centerx + (p1[0]*costh + p1[1]*sinth) - xofst
+            x2 = centerx + (p2[0]*costh + p2[1]*sinth) - xofst
+            x3 = centerx + (p3[0]*costh + p3[1]*sinth) - xofst
+            x4 = centerx + (p4[0]*costh + p4[1]*sinth) - xofst
+            y1 = centery - (p1[0]*sinth - p1[1]*costh) - yofst
+            y2 = centery - (p2[0]*sinth - p2[1]*costh) - yofst
+            y3 = centery - (p3[0]*sinth - p3[1]*costh) - yofst
+            y4 = centery - (p4[0]*sinth - p4[1]*costh) - yofst
+            bbox = (min(x1, x2, x3, x4), max(x1, x2, x3, x4), 
+                    min(y1, y2, y3, y4), max(y1, y2, y3, y4))
+            
+            if self.rotation_mode == 'default':
+                dx = {'left': x - bbox[0],
+                      'right': x - bbox[1],
+                      'center': x - (bbox[1]+bbox[0])/2}.get(self.halign, 0)
+                dy = {'top': y - bbox[2],
+                      'bottom': y - bbox[3],
+                      'base': -sinth*dx,
+                      'center': y - (bbox[3]+bbox[2])/2}.get(self.valign, 0)
+                xform = f'translate({xy[0]+dx} {xy[1]+dy})'
+                bbox = (bbox[0]+dx, bbox[1]+dx,
+                        bbox[2]+dy, bbox[3]+dy)
+            xform += f' rotate({-self.rotation} {-xofst} {-yofst})'
+
+        if config.debug:
+            rect = ET.SubElement(svg, 'rect')
+            rect.attrib['x'] = fmt(bbox[0])
+            rect.attrib['y'] = fmt(bbox[2])
+            rect.attrib['width'] = fmt(bbox[1]-bbox[0])
+            rect.attrib['height'] = fmt(bbox[3]-bbox[2])
+            rect.attrib['fill'] = 'none'
+            rect.attrib['stroke'] = 'blue'
+
+        word.attrib['transform'] = xform
+        return svg, bbox
 
     def _buildstring(self) -> Symbols:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
