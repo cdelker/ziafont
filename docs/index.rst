@@ -15,11 +15,11 @@ Example
 
     import ziafont
     font = ziafont.Font('NotoSerif-Regular.ttf')
-    font.str2svg('Ziafont!')
+    ziafont.Text('Ziafont!', font=font)
 
 .. jupyter-execute::
 
-    s = font.str2svg('Z').svg()
+    s = ziafont.Text('Z', font=font).svg()
     print(s[:80])  # Just show 80 characters here...
 
 |

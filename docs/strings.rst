@@ -11,40 +11,38 @@ Start by importing Ziafont and loading a font from a file:
 
 The font name can be a path to a ttf or otf font file, or the name of a font (such as 'Arial') located in a system fonts path. If no font name is specified, a built-in font will be used.
 
-Strings can be converted to SVG using :py:meth:`ziafont.font.Font.str2svg`. This method returns a :py:class:`ziafont.font.SVGdraw` object, which provides a Jupyter representation of the string, but also has methods for getting the SVG as text or as an XML element.
+Strings can be converted to SVG using :py:meth:`ziafont.font.Text` objects. This object provides a Jupyter representation of the string drawn as SVG, but also has methods for getting the SVG as text or as an XML element.
+Running the following line in a Jupyter cell displays the rendered string.
 
 .. jupyter-execute::
 
-    font.str2svg('Example')
+    ziafont.Text('Example', font=font)
 
 |
 
 Getting SVG data
 ----------------
 
-Use the `.svg()` method to get a standalone SVG image as a string, which can then be saved to a file:
+Use the `.svg()` method to get a standalone SVG data as a string, which can then be saved to a file:
 
 .. jupyter-execute::
 
-    s = font.str2svg('Example').svg()
+    s = ziafont.Text('Example', font=font).svg()
     print(s[:80])  # Just show 80 characters here...
 
 
-Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3/library/xml.etree.elementtree.html>`_ that can be added to manually:
+Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3/library/xml.etree.elementtree.html>`_:
 
 .. jupyter-execute::
 
-    font.str2svg('Example').svgxml()
-
-The default font size can be set for all future str2svg calls using :py:meth:`ziafont.set_fontsize`.
+    ziafont.Text('Example', font=font).svgxml()
 
 |
 
 Drawing on an existing SVG
 --------------------------
 
-To draw the string onto an existing SVG, create an SVG XML structure as an XML ElementTree, and pass it as the `canvas` parameter to :py:meth:`ziafont.font.Font.str2svg` along with an `xy` position within the SVG canvas.
-
+To draw the string onto an existing SVG, use the :py:meth:`ziafont.font.Text.drawon` method. Create an SVG XML structure as an XML ElementTree, and pass it as the `svg` parameter along with an `xy` position within the SVG canvas.
 
 .. jupyter-execute::
 
@@ -52,18 +50,18 @@ To draw the string onto an existing SVG, create an SVG XML structure as an XML E
     from xml.etree import ElementTree as ET
 
     svg = ET.Element('svg')
-    svg.attrib['width'] = '100'
-    svg.attrib['height'] = '50'
-    svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
-    svg.attrib['viewBox'] = f'0 0 100 50'
+    svg.set('width', '100')
+    svg.set('height', '50')
+    svg.set('xmlns', 'http://www.w3.org/2000/svg')
+    svg.set('viewBox', f'0 0 100 50')
     circ = ET.SubElement(svg, 'circle')
-    circ.attrib['cx'] = '50'
-    circ.attrib['cy'] = '25'
-    circ.attrib['r'] = '25'
-    circ.attrib['fill'] = 'orange'
+    circ.set('cx', '50')
+    circ.set('cy', '25')
+    circ.set('r', '25')
+    circ.set('fill', 'orange')
 
-    font.str2svg('Hello', fontsize=18, canvas=svg, xy=(50, 25))
-    font.str2svg('123', fontsize=14, canvas=svg, xy=(75, 40))
+    ziafont.Text('Hello', font=font, size=18).drawon(svg, 50, 25)
+    ziafont.Text('123', font=font, size=14).drawon(svg, 75, 40)
 
     SVG(ET.tostring(svg))
 
@@ -72,12 +70,23 @@ To draw the string onto an existing SVG, create an SVG XML structure as an XML E
 Multi-line strings
 ------------------
 
-Multi-line strings (containing `\n` characters) can be drawn. Use `halign` to set horizontal alignment ('left', 'center', or 'right'), and `linespacing` to control the spacing between lines as a multiplier to the normal font-specified line spacing.
-The resulting SVG does not require the font to be installed or available to render correctly.
+Multi-line strings (containing `\\n` characters) can be drawn. Use `halign` to set horizontal alignment ('left', 'center', or 'right'), and `linespacing` to control the spacing between lines as a multiplier to the normal font-specified line spacing.
 
 .. jupyter-execute::
 
-    font.str2svg('Two\nLines', halign='center', linespacing=.6)
+    ziafont.Text('Two\nLines', font=font, halign='center', linespacing=.8)
+
+|
+
+Rotation
+--------
+
+Text can be rotated by providing an angle in degrees.
+The `rotation_mode` parameter matches `Matplotlib <https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html>`_ `anchor` or `default` behavior for specifying the center of rotation.
+
+.. jupyter-execute::
+
+    ziafont.Text('Rotated', font=font, rotation=30)
 
 |
 
@@ -88,22 +97,22 @@ If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/open
 
 .. jupyter-execute::
 
-    font.str2svg('VALVES', kern=True)
+    ziafont.Text('VALVES', font=font, kern=True)
 
 .. jupyter-execute::
 
-    font.str2svg('VALVES', kern=False)
+    ziafont.Text('VALVES', font=font, kern=False)
 
 |
 
 Calculating string size
 -----------------------
 
-The method :py:meth:`ziafont.font.Font.getsize` can be used to calculate the pixel width and height of a string without drawing it.
+The method :py:meth:`ziafont.font.Text.getsize` can be used to calculate the pixel width and height of a string without drawing it.
 
 .. jupyter-execute::
 
-    font.getsize('How wide is this string?')
+    ziafont.Text('How wide is this string?').getsize()
 
 |
 
@@ -111,6 +120,17 @@ Configuration Options
 ---------------------
 
 The `ziafont.config` object provides some global configuration options.
+
+|
+
+Default Font Size
+*****************
+
+The default font size can be specified with:
+
+.. code-block:: python
+
+    ziafont.config.fontsize = 36
 
 |
 
@@ -124,17 +144,6 @@ as each glyph is included as its own <path> element rather than being reused wit
 .. code-block:: python
 
     ziafont.config.svg2 = False
-
-|
-
-Default Font Size
-*****************
-
-The default font size can be specified with:
-
-.. code-block:: python
-
-    ziafont.config.fontsize = 36
 
 |
 

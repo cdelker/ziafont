@@ -9,7 +9,7 @@ Drawing Glyphs
 
 
 At a lower level, Ziafont can also draw individual glyphs. The glyph for a string character can be obtained from :py:meth:`ziafont.font.Font.glyph`.
-Like str2svg, this method returns an object with methods for returning SVG as a string or as an SVG XML element.
+Similar to :py:meth:`ziafont.font.Text`, this method returns a Glyph object with methods for returning SVG as a string or as an SVG XML element.
 
 
 .. jupyter-execute::
