@@ -326,6 +326,7 @@ class Font:
     def str2svg(self, s: str, fontsize: float=None, linespacing: float=1,
                 halign: Literal['left', 'center', 'right']='left',
                 valign: Literal['base', 'center', 'top']='base',
+                color: str=None,
                 canvas: ET.Element=None,
                 xy: Sequence[float]=(0, 0),
                 rotation: float=0, rotation_mode: str='anchor',
@@ -338,6 +339,7 @@ class Font:
                 linespacing: Space between lines
                 halign: Horizontal Alignment
                 valign: Vertical Alignment
+                color: Color for string
                 canvas: SVG XML element to draw on
                 xy: Position to draw on canvas
                 rotation: Rotation angle in degrees
@@ -346,7 +348,7 @@ class Font:
                     https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
                 kern: Use font kerning adjustment
         '''
-        txt = Text(s, self, fontsize, linespacing, halign, valign, kern=kern, rotation=rotation, rotation_mode=rotation_mode)
+        txt = Text(s, self, fontsize, linespacing, halign, valign, color=color, kern=kern, rotation=rotation, rotation_mode=rotation_mode)
         if canvas is not None:
             txt.drawon(canvas, xy[0], xy[1])
         return txt
@@ -360,6 +362,7 @@ class Text:
             font: Font name or ziafont.Font to use
             size: Font size in points
             linespacing: Spacing between lines
+            color: Color for string
             halign: Horizontal Alignment
             valign: Vertical Alignment
             rotation: Rotation angle in degrees
@@ -372,12 +375,14 @@ class Text:
                  size: float=None, linespacing: float=1,
                  halign: Literal['left', 'center', 'right']='left',
                  valign: Literal['base', 'center', 'top']='base',
+                 color: str=None,
                  rotation: float=0,
                  rotation_mode: str='anchor',
                  kern: bool=True):
         self.str = s
         self.halign = halign
         self.valign = valign
+        self.color = color
         self.rotation = rotation
         self.rotation_mode = rotation_mode
         self.size = size if size else config.fontsize
@@ -503,6 +508,8 @@ class Text:
             rect.attrib['stroke'] = 'blue'
 
         word.attrib['transform'] = xform
+        if self.color:
+            word.attrib['fill'] = self.color
         return svg, bbox
 
     def _buildstring(self) -> Symbols:

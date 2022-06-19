@@ -1,5 +1,12 @@
 # Release notes
 
+### 0.4 - IN PROGRESS
+
+- Added global configuration object
+- Added rotation parameter
+- Added color parameter
+
+
 ### 0.3 - 2022-05-28
 
 - Locate fonts by name from system font paths
