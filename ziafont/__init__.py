@@ -2,4 +2,4 @@ from .config import config
 from .font import Font, Text, findfont, fontindex
 
 
-__version__ = '0.3.1'
+__version__ = '0.4'

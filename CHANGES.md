@@ -1,10 +1,11 @@
 # Release notes
 
-### 0.4 - IN PROGRESS
+### 0.4 - 2022-06-20
 
 - Added global configuration object
 - Added rotation parameter
 - Added color parameter
+- Renamed str2svg to text
 
 
 ### 0.3 - 2022-05-28
