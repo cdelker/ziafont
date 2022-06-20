@@ -1,7 +1,7 @@
 ''' Read font file and write glyphs to SVG '''
 
 from __future__ import annotations
-from typing import Literal, Sequence, Union, Optional, Dict
+from typing import Literal, Union, Optional, Dict
 import sys
 import os
 import math
@@ -38,7 +38,7 @@ class Font:
             self.fname = findfont(name, style)
             if self.fname is None:
                 warnings.warn(f'Font {name} not found.')
-            
+
         if self.fname is None:
             with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
@@ -323,34 +323,33 @@ class Font:
         txt = Text(s, self)
         return txt.getsize()
 
-    def str2svg(self, s: str, fontsize: float=None, linespacing: float=1,
-                halign: Literal['left', 'center', 'right']='left',
-                valign: Literal['base', 'center', 'top']='base',
-                color: str=None,
-                canvas: ET.Element=None,
-                xy: Sequence[float]=(0, 0),
-                rotation: float=0, rotation_mode: str='anchor',
-                kern=True):
-        ''' Convert a string to SVG
+    def text(self, s: str,
+             size: float=None,
+             linespacing: float=1,
+             halign: Literal['left', 'center', 'right']='left',
+             valign: Literal['base', 'center', 'top']='base',
+             color: str=None,
+             rotation: float=0,
+             rotation_mode: str='anchor',
+             kern=True):
+        ''' Create a Text object using this font
 
             Args:
                 s: String to convert.
-                fontsize: Font size in points
+                size: Font size in points
                 linespacing: Space between lines
                 halign: Horizontal Alignment
                 valign: Vertical Alignment
                 color: Color for string
-                canvas: SVG XML element to draw on
-                xy: Position to draw on canvas
                 rotation: Rotation angle in degrees
                 rotation_mode: Either 'default' or 'anchor', to
                     mimic Matplotlib behavoir. See:
                     https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
                 kern: Use font kerning adjustment
         '''
-        txt = Text(s, self, fontsize, linespacing, halign, valign, color=color, kern=kern, rotation=rotation, rotation_mode=rotation_mode)
-        if canvas is not None:
-            txt.drawon(canvas, xy[0], xy[1])
+        txt = Text(s, self, size=size, linespacing=linespacing, halign=halign, valign=valign,
+                   color=color, kern=kern, rotation=rotation,
+                   rotation_mode=rotation_mode)
         return txt
 
 
@@ -425,7 +424,6 @@ class Text:
         ''' Draw text on the SVG '''
         word, symbols, width, ymin, ymax = self._symbols
         height = ymax-ymin
-        xyorig = x, y
         # Adjust vertical alignment
         yofst = {'base': 0,
                  'bottom': -ymax,
@@ -458,8 +456,8 @@ class Text:
             rect.attrib['fill'] = 'none'
             rect.attrib['stroke'] = 'red'
             circ = ET.SubElement(word, 'circle')
-            circ.attrib['cx'] = fmt(-xofst)#'0'#fmt(xy[0])
-            circ.attrib['cy'] = fmt(-yofst)#'0'#fmt(xy[1])
+            circ.attrib['cx'] = fmt(-xofst)
+            circ.attrib['cy'] = fmt(-yofst)
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
@@ -482,9 +480,9 @@ class Text:
             y2 = centery - (p2[0]*sinth - p2[1]*costh) - yofst
             y3 = centery - (p3[0]*sinth - p3[1]*costh) - yofst
             y4 = centery - (p4[0]*sinth - p4[1]*costh) - yofst
-            bbox = (min(x1, x2, x3, x4), max(x1, x2, x3, x4), 
+            bbox = (min(x1, x2, x3, x4), max(x1, x2, x3, x4),
                     min(y1, y2, y3, y4), max(y1, y2, y3, y4))
-            
+
             if self.rotation_mode == 'default':
                 dx = {'left': x - bbox[0],
                       'right': x - bbox[1],
