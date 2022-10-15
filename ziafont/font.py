@@ -210,7 +210,8 @@ class Font:
         self.cmaps: list[Union[Cmap12, Cmap4]] = []
         cmap: Union[Cmap12, Cmap4]
         for ctable in cmaptables:
-            cmapformat = self.fontfile.readuint16(self.tables['cmap'].offset + ctable.offset)
+            ctable_ofst = self.tables['cmap'].offset + ctable.offset
+            cmapformat = self.fontfile.readuint16(ctable_ofst)
             if cmapformat == 4:
                 endcodes = []
                 startcodes = []
@@ -235,7 +236,7 @@ class Font:
 
                 # Length of glyph array comes from total length of cmap table
                 # //2 because len is in bytes, but table glyphidxarray is 16-bit
-                glyphtablelen = (length - (self.fontfile.tell() - self.tables['cmap'].offset)) // 2
+                glyphtablelen = (length - (self.fontfile.tell() - ctable_ofst)) // 2
                 for i in range(glyphtablelen):
                     glyphidxarray.append(self.fontfile.readuint16())
                 cmap = Cmap4(ctable.platform, ctable.platformid,
