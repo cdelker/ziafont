@@ -15,9 +15,11 @@ from .config import config
 from .fontread import FontReader
 from . import gpos
 from .cmap import Cmap12, Cmap4
-from .glyph import read_glyph, fmt, SimpleGlyph, CompoundGlyph
+from .glyph import SimpleGlyph, CompoundGlyph
+from .glyphcff import read_glyph_cff, CFF
+from .glyphglyf import read_glyph_glyf
 from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols
-
+from .svgpath import fmt
 
 fontindex = None
 
@@ -30,7 +32,7 @@ class Font:
             style: Font style such as "bold" or "italic", used when searching
                 system paths for a font file
     '''
-    def __init__(self, name: Union[str, Path]=None, style: str='regular'):
+    def __init__(self, name: Union[str, Path] = None, style: str = 'regular'):
         self.fname = None
         if name and Path(name).exists():
             self.fname = Path(name)
@@ -45,9 +47,11 @@ class Font:
 
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
+
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
         self._glyphids: Dict[str, int] = {}
+        self.cffdata: Optional[CFF] = None
 
     def _loadfont(self) -> FontInfo:
         ''' Read font metadata '''
@@ -81,10 +85,10 @@ class Font:
                                      offset=self.fontfile.readuint32(),
                                      length=self.fontfile.readuint32())
 
-        if 'glyf' not in self.tables:
-            raise ValueError('Unsupported font (no glyf table).')
+        if 'glyf' not in self.tables and 'CFF ' not in self.tables:
+            raise ValueError('Unsupported font (no glyf or CFF table).')
 
-    def verifychecksum(self):
+    def verifychecksum(self) -> None:
         ''' Verify checksum of all font tables. Raises ValueError if invalid '''
         for table in self.tables.keys():
             if table != 'head':
@@ -271,24 +275,7 @@ class Font:
             gid = self.cmap.glyphid(char)  # type: ignore
             self._glyphids[char] = gid
         return gid
-
-    def _glyphoffset(self, index: int) -> Optional[int]:
-        ''' Get offset (from beginning of file) of glyph,
-            Return None if no glyph (empty/space) at this index.
-        '''
-        if self.info.header.indextolocformat == 1:
-            offset = self.fontfile.readuint32(self.tables['loca'].offset + index * 4)
-            nextofst = self.fontfile.readuint32()
-        else:
-            offset = self.fontfile.readuint16(self.tables['loca'].offset + index * 2) * 2
-            nextofst = self.fontfile.readuint16() * 2
-
-        if offset == nextofst:
-            # Empty glyphs (ie space) have no length.
-            return None
-        else:
-            return offset + self.tables['glyf'].offset
-
+            
     def glyph(self, char: str) -> SimpleGlyph:
         ''' Get the Glyph for the character '''
         index = self.glyphindex(char)        # Glyph Number
@@ -302,11 +289,14 @@ class Font:
         '''
         glyph = self._glyphs.get(glyphid)
         if glyph is None:
-            glyph = read_glyph(glyphid, self)
+            if 'CFF ' in self.tables:
+                glyph = read_glyph_cff(glyphid, self)
+            else:  # 'glyf' table
+                glyph = read_glyph_glyf(glyphid, self)
             self._glyphs[glyphid] = glyph
         return glyph
 
-    def advance(self, glyph1: int, glyph2: int=None, kern: bool=True):
+    def advance(self, glyph1: int, glyph2: int = None, kern: bool = True):
         ''' Get advance width in font units, including kerning adjustment if glyph2 is defined '''
         try:
             adv = self.advwidths[glyph1].width
@@ -370,14 +360,14 @@ class Text:
                 https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
             kern: Use kerning adjustment
     '''
-    def __init__(self, s: str,  font: Union[str, Font]=None,
-                 size: float=None, linespacing: float=1,
-                 halign: Literal['left', 'center', 'right']='left',
-                 valign: Literal['base', 'center', 'top']='base',
-                 color: str=None,
-                 rotation: float=0,
-                 rotation_mode: str='anchor',
-                 kern: bool=True):
+    def __init__(self, s: str,  font: Union[str, Font] = None,
+                 size: float = None, linespacing: float = 1,
+                 halign: Literal['left', 'center', 'right'] = 'left',
+                 valign: Literal['base', 'center', 'top'] = 'base',
+                 color: str = None,
+                 rotation: float = 0,
+                 rotation_mode: str = 'anchor',
+                 kern: bool = True):
         self.str = s
         self.halign = halign
         self.valign = valign
@@ -415,12 +405,12 @@ class Text:
         ''' Jupyter representer '''
         return self.svg()
 
-    def drawon(self, svg: ET.Element, x: float=0, y: float=0):
+    def drawon(self, svg: ET.Element, x: float = 0, y: float = 0):
         ''' Draw text on the SVG '''
         svg, _ = self._drawon(svg, x, y)
         return svg
 
-    def _drawon(self, svg: ET.Element, x: float=0, y: float=0):
+    def _drawon(self, svg: ET.Element, x: float = 0, y: float = 0):
         ''' Draw text on the SVG '''
         word, symbols, width, ymin, ymax = self._symbols
         height = ymax-ymin
@@ -531,11 +521,11 @@ class Text:
                 lineglyphs.append((glyph, x))
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
                 xadvance = glyph.advance(nextglyph, kern=self.kern)
-                x += (xadvance - min(0, glyph.path.bbox.xmin)) * scale
+                x += (xadvance - min(0, glyph.bbox.xmin)) * scale
 
-            if glyph.path.bbox.xmax > xadvance:
+            if glyph.bbox.xmax > xadvance:
                 # Make a bit wider to grab right edge that extends beyond advance width
-                x += (glyph.path.bbox.xmax - xadvance) * scale
+                x += (glyph.bbox.xmax - xadvance) * scale
             linewidths.append(x)
             allglyphs.append(lineglyphs)
 

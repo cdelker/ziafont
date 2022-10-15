@@ -15,6 +15,12 @@ class FontReader(BytesIO):
             self.seek(offset)
         return struct.unpack('>I', self.read(4))[0]
 
+    def readuint24(self, offset: int=None) -> int:
+        ''' Read 24-bit unsigned integer '''
+        if offset:
+            self.seek(offset)
+        return int.from_bytes(self.read(3), 'big')
+    
     def readuint16(self, offset: int=None) -> int:
         ''' Read 16-bit unsigned integer '''
         if offset:
