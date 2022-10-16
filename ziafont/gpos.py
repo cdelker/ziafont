@@ -286,37 +286,49 @@ class PairAdjustmentTable:
 
 
 class Coverage:
-    ''' Coverage Table - defines which glyphs apply to this lookup '''
-    def __init__(self, ofst: int, fontfile: FontReader):
+    ''' Coverage Table - defines which glyphs apply to this lookup
+
+        Parameters
+        ----------
+        ofst: Byte offset from start of file
+        fontfile: Font file to read from
+        nulltable: Set true if this table is null
+    '''
+    def __init__(self, ofst: int, fontfile: FontReader, nulltable: bool = False):
         self.ofst = ofst
         self.fontfile = fontfile
-        fileptr = self.fontfile.tell()
+        self.nulltable = nulltable
+        if not self.nulltable:
+            fileptr = self.fontfile.tell()
 
-        self.fontfile.seek(self.ofst)
-        self.format = self.fontfile.readuint16()
+            self.fontfile.seek(self.ofst)
+            self.format = self.fontfile.readuint16()
 
-        if self.format == 1:
-            glyphcnt = self.fontfile.readuint16()
-            self.glyphs = []
-            for i in range(glyphcnt):
-                self.glyphs.append(self.fontfile.readuint16())
+            if self.format == 1:
+                glyphcnt = self.fontfile.readuint16()
+                self.glyphs = []
+                for i in range(glyphcnt):
+                    self.glyphs.append(self.fontfile.readuint16())
 
-        elif self.format == 2:
-            rangecnt = self.fontfile.readuint16()
-            Range = namedtuple('Range', ['startglyph', 'endglyph', 'covidx'])
-            self.ranges = []
-            for i in range(rangecnt):
-                self.ranges.append(Range(
-                    self.fontfile.readuint16(),
-                    self.fontfile.readuint16(),
-                    self.fontfile.readuint16()))
-        else:
-            raise ValueError('Bad coverage table format')
+            elif self.format == 2:
+                rangecnt = self.fontfile.readuint16()
+                Range = namedtuple('Range', ['startglyph', 'endglyph', 'covidx'])
+                self.ranges = []
+                for i in range(rangecnt):
+                    self.ranges.append(Range(
+                        self.fontfile.readuint16(),
+                        self.fontfile.readuint16(),
+                        self.fontfile.readuint16()))
+            else:
+                raise ValueError('Bad coverage table format')
 
-        self.fontfile.seek(fileptr)  # Put file pointer back
+            self.fontfile.seek(fileptr)  # Put file pointer back
 
     def covidx(self, glyph: int) -> Optional[int]:
         ''' Get coverage index for this glyph, or None if not in the coverage range '''
+        if self.nulltable:
+            return None
+
         if self.format == 1:
             try:
                 idx: Optional[int] = self.glyphs.index(glyph)
