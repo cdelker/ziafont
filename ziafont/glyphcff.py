@@ -298,6 +298,45 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
                     operators.append(Cubic(p1, p2, p))
                     value = value[8:]
 
+        elif op == Operator.FLEX:
+            dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, *_ = value
+            p1 = p + Point(dx1, dy1)
+            p2 = p1 + Point(dx2, dy2)
+            p3 = p2 + Point(dx3, dy3)
+            p4 = p3 + Point(dx4, dy4)
+            p5 = p4 + Point(dx5, dy5)
+            p = p5 + Point(dx6, dy6)
+            operators.append(Cubic(p1, p2, p3))
+            operators.append(Cubic(p4, p5, p))
+
+        elif op == Operator.FLEX1:
+            dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, d6, *_ = value
+            dx = dx1+dx2+dx3+dx4+dx5
+            dy = dy1+dy2+dy3+dy4+dy5
+            
+            p1 = p + Point(dx1, dy1)
+            p2 = p1 + Point(dx2, dy2)
+            p3 = p2 + Point(dx3, dy3)
+            p4 = p3 + Point(dx4, dy4)
+            p5 = p4 + Point(dx5, dy5)
+            if abs(dx) > abs(dy):
+                p = p5 + Point(d6, 0)
+            else:
+                p = p5 + Point(0, d6)
+            operators.append(Cubic(p1, p2, p3))
+            operators.append(Cubic(p4, p5, p))
+            
+        elif op == Operator.HFLEX:
+            dx1, dx2, dy2, dx3, dx4, dx5, dx6, *_ = value
+            p1 = p + Point(dx1, 0)
+            p2 = p1 + Point(dx2, dy2)
+            p3 = p2 + Point(dx3, 0)
+            p4 = p3 + Point(dx4, 0)
+            p5 = p4 + Point(dx5, 0)
+            p = p5 + Point(dx6, 0)
+            operators.append(Cubic(p1, p2, p3))
+            operators.append(Cubic(p4, p5, p))
+
         elif op == Operator.HFLEX1:
             dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6, *_ = value
             p1 = p + Point(dx1, dy1)
@@ -496,7 +535,7 @@ def readdict(buf: bytes) -> dict:
         elif buf[0] == 30:
             v, nbytes = readreal(buf[1:])
             value.append(v)
-            i += (nbytes+1)
+            i = (nbytes+1)
         else:
             warnings.warn('Bad encoding byte: ' + str(buf[0]))
             value.append(0)
