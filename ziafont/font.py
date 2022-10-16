@@ -21,27 +21,21 @@ from .glyphglyf import read_glyph_glyf
 from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols
 from .svgpath import fmt
 
-fontindex = None
-
 
 class Font:
     ''' Class to read/parse a OpenType/TTF and write glyphs to SVG
 
         Args:
-            name: File name of the font
-            style: Font style such as "bold" or "italic", used when searching
-                system paths for a font file
+            name: File name of the font. Defaults to DejaVuSans.
     '''
-    def __init__(self, name: Union[str, Path] = None, style: str = 'regular'):
+    def __init__(self, name: Union[str, Path] = None):
         self.fname = None
-        if name and Path(name).exists():
-            self.fname = Path(name)
-        elif name:
-            self.fname = findfont(name, style)
-            if self.fname is None:
-                warnings.warn(f'Font {name} not found.')
-
-        if self.fname is None:
+        if name:
+            if Path(name).exists():
+                self.fname = Path(name)
+            else:
+                raise FileNotFoundError(f'Font {name} not found.')
+        else:
             with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
 
@@ -558,51 +552,3 @@ class Text:
     def getyofst(self) -> float:
         ''' Y-shift from bottom of bbox to 0 '''
         return -self._symbols.ymax
-
-
-def _build_fontlist():
-    ''' Generate list of system fonts locations and their names '''
-    if sys.platform.startswith('win'):
-        paths = [Path(r'C:\Windows\Fonts'),
-                 Path(os.path.expandvars(r'%APPDATA%\Microsoft\Windows\Fonts'))]
-    elif sys.platform.startswith('darwin'):
-        paths = [Path().home() / 'Library/Fonts',
-                 Path('/Library/Fonts/'),
-                 Path('/System/Library/Fonts')]
-    else:
-        paths = [Path('/usr/share/fonts/'),
-                 Path('/usr/local/share/fonts/'),
-                 Path().home() / '.fonts',
-                 Path().home() / '.local/share/fonts']
-
-    fontlist = []
-    for p in paths:
-        fontlist.extend(p.rglob('*.ttf'))
-        fontlist.extend(p.rglob('*.otf'))
-
-    findex = {}
-    for fname in fontlist:
-        try:
-            f = Font(fname)
-        except ValueError:
-            continue  # Unsupported Font
-        family = f.info.names.family.lower()
-        subfamily = f.info.names.subfamily.lower()
-        subfamily = subfamily.replace('book', 'regular').replace('normal', 'regular')
-        subfamily = subfamily.replace('italique', 'italic').replace('gras', 'bold')
-        findex[(family, subfamily)] = fname
-    return findex
-
-
-def findfont(name, style='Regular'):
-    ''' Find a font file by name '''
-    if name is None:
-        return None
-
-    if Path(name).exists():
-        return Path(name)
-
-    global fontindex
-    if fontindex is None:
-        fontindex = _build_fontlist()
-    return fontindex.get((name.lower(), style.lower()), None)

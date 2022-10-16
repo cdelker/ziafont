@@ -1,5 +1,12 @@
 # Release notes
 
+### 0.5 - IN PROGRESS
+
+- Added support for CFF font table (usually .otf fonts)
+- Fix index errors when reading some fonts
+- Only specify font by filename
+
+
 ### 0.4 - 2022-06-20
 
 - Added global configuration object

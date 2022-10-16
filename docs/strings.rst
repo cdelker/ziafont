@@ -9,7 +9,8 @@ Start by importing Ziafont and loading a font from a file:
     font = ziafont.Font('NotoSerif-Regular.ttf')
 
 
-The font name can be a path to a ttf or otf font file, or the name of a font (such as 'Arial') located in a system fonts path. If no font name is specified, a built-in font will be used.
+The font name must be a path to a ttf or otf font file.
+If no font name is specified, a built-in font will be used.
 
 Strings can be converted to SVG using :py:class:`ziafont.font.Text` objects. This object provides a Jupyter representation of the string drawn as SVG, but also has methods for getting the SVG as text or as an XML element.
 Running the following line in a Jupyter cell displays the rendered string.
