@@ -5,6 +5,7 @@
 - Added support for CFF font table (usually .otf fonts)
 - Fix index errors when reading some fonts
 - Only specify font by filename
+- Strip empty path elements from SVG
 
 
 ### 0.4 - 2022-06-20

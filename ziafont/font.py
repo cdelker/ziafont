@@ -526,7 +526,8 @@ class Text:
 
         # Place the glyphs based on halign
         word = ET.Element('g')
-        word.attrib['word'] = self.str  # Just an identifier for debugging
+        if config.debug:
+            word.attrib['word'] = self.str  # Just an identifier for debugging
         totwidth = max(linewidths)
         for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
             if self.halign == 'center':
@@ -536,7 +537,9 @@ class Text:
             else:  # halign = 'left'
                 leftshift = 0
             for glyph, x in lineglyphs:
-                word.append(glyph.place(x+leftshift, yvals[lineidx], self.size))
+                elm = glyph.place(x+leftshift, yvals[lineidx], self.size)
+                if elm is not None:
+                    word.append(elm)
 
         ymin = yvals[0] - self.font.info.layout.ascent*scale
         ymax = yvals[-1] - self.font.info.layout.descent*scale

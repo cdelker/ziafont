@@ -1,7 +1,7 @@
 ''' Glyph classes '''
 
 from __future__ import annotations
-from typing import Sequence, TYPE_CHECKING
+from typing import Sequence, Optional, TYPE_CHECKING
 from types import SimpleNamespace
 
 import os
@@ -36,10 +36,11 @@ class SimpleGlyph:
     def _repr_svg_(self):
         return ET.tostring(self.svgxml(), encoding='unicode')
 
-    def place(self, x: float, y: float, fontsize: float) -> ET.Element:
+    def place(self, x: float, y: float, fontsize: float) -> Optional[ET.Element]:
         ''' Get <use> svg tag translated/scaled to the right position '''
         fntscale = (fontsize/self.dfltsize)
         yshift = self.font.info.layout.ymax * self.emscale * fntscale
+        elm: Optional[ET.Element]
         if config.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
@@ -54,12 +55,14 @@ class SimpleGlyph:
             nextchr = nextchr.index
         return self.font.advance(self.index, nextchr, kern=kern)
 
-    def svgpath(self, x0: float = 0, y0: float = 0, scale: float = 1) -> ET.Element:
+    def svgpath(self, x0: float = 0, y0: float = 0, scale: float = 1) -> Optional[ET.Element]:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
         emscale = self.emscale * scale
         path = ''
         for i, op in enumerate(self.operators):
             path += op.path(x0, y0, scale=emscale)
+        if path == '':
+            return None
         path += 'Z '
         return ET.Element('path', attrib={'d': path})
 
@@ -77,7 +80,9 @@ class SimpleGlyph:
         sym.attrib['width'] = fmt(width)
         sym.attrib['height'] = fmt(height)
         sym.attrib['viewBox'] = f'{fmt(xmin)} {fmt(-ymax)} {fmt(width)} {fmt(height)}'
-        sym.append(self.svgpath())
+        path = self.svgpath()
+        if path is not None:
+            sym.append(path)
         return sym
 
     def svg(self, fontsize: float = None, svgver: int = 2) -> str:
@@ -110,7 +115,8 @@ class SimpleGlyph:
         if not config.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
             elm = self.svgpath(x0=xmin, y0=base, scale=scale)
-            svg.append(elm)
+            if elm is not None:
+                svg.append(elm)
         else:
             svg.attrib['viewBox'] = f'{fmt(xmin)} 0 {fmt(width)} {fmt(height)}'
             symbol = self.svgsymbol()
