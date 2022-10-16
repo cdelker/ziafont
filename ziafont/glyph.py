@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 from typing import Sequence, TYPE_CHECKING
+from types import SimpleNamespace
 
 import os
 import xml.etree.ElementTree as ET
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from .font import Font
 
 
+    
 class SimpleGlyph:
     ''' Simple Glyph '''
     dfltsize = 12   # Draw <symbols> in this point size
@@ -24,6 +26,8 @@ class SimpleGlyph:
         self.index = index
         self.operators = operators
         self.bbox = bbox
+        self.path = SimpleNamespace()
+        self.path.bbox = bbox  # Only for backward-compatibility
         self.font = font
         basename, _ = os.path.splitext(os.path.basename(self.font.info.filename))
         self.id = f'{basename}_{index}'

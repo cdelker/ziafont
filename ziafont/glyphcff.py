@@ -46,9 +46,57 @@ class Operator(Enum):
     CALLGSUBR = 29
     VHCURVETO = 30
     HVCURVETO = 31
-    # TODO: 12.XXX codes
-
+    # 2-byte codes
+    AND = 0x0c03
+    OR = 0x0c04
+    NOT = 0x0c05
+    ABS = 0x0c09
+    ADD = 0x0c0a
+    SUB = 0x0c0c
+    NEG = 0x0c0e
+    EQ = 0x0c0f
+    DROP = 0x0c12
+    PUT = 0x0c14
+    GET = 0x0c15
+    IFELSE = 0x0c16
+    RANDOM = 0x0c17
+    MUL = 0x0c18
+    SQRT = 0x0c1a
+    DUP = 0x0c1b
+    EXCH = 0x0c1c
+    INDEX = 0x0c1d
+    ROLL = 0x0c1e
+    HFLEX = 0x0c22
+    FLEX = 0x0c23
+    HFLEX1 = 0x0c24
+    FLEX1 = 0x0c25
     WIDTH = -999  # Not numbered in CFF spec
+
+
+def readreal(buf: bytes) -> tuple[float, int]:
+    ''' Read real/float value from buffer. Returns (value, #bytes read) '''
+    nibbles = {
+        0x0a: '.',
+        0x0b: 'E',
+        0x0c: 'E-',
+        # 0x0d: RESERVED,
+        0x0e: '-',
+        0x0f: ''}  # END
+
+    numstr = ''
+    i = 0
+    while True:
+        nib1 = (buf[i] & 0xF0) >> 4
+        nib2 = (buf[i] & 0x0F)
+        if nib1 == 0x0f:
+            break
+        numstr += nibbles.get(nib1, str(nib1))
+        if nib2 == 0x0f:
+            break
+        numstr += nibbles.get(nib2, str(nib2))
+        i += 1
+
+    return float(numstr), i+1
 
 
 def read_glyph_cff(glyphid: int, font: Font) -> SimpleGlyph:
@@ -68,10 +116,11 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
     operators: list[SVGOpType] = []
     width = cff.defaultwidth
     p = Point(0, 0)
-    for op, value in readcharstr(charstr, cff):
-        # print(op, value)
+    chstate = CharString(charstr, cff)
+    op = None
+    for op, value in zip(chstate.operators, chstate.operands):
         if op == Operator.WIDTH:
-            width += int(value[0])
+            width = cff.nominalwidth + int(value[0])
         elif op == Operator.RMOVETO:
             p = p + Point(value[0], value[1])
             operators.append(Moveto(p))
@@ -103,16 +152,15 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
                 operators.append(Lineto(p))
 
         elif op in [Operator.RRCURVETO, Operator.RCURVELINE]:
-            n = 0
             while len(value) > 2:
-                n += 1
                 dxa, dya, dxb, dyb, dxc, dyc, *_ = value
                 p1 = p + Point(dxa, dya)
                 p2 = p1 + Point(dxb, dyb)
                 p = p2 + Point(dxc, dyc)
                 operators.append(Cubic(p1, p2, p))
                 value = value[6:]
-            if len(value) == 2:
+            if op == Operator.RCURVELINE:
+                assert len(value) >= 2
                 # RCURVELINE ends with a line
                 p = p + Point(value[0], value[1])
                 operators.append(Lineto(p))
@@ -130,12 +178,44 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
             p = p2 + Point(dxc, dyc)
             operators.append(Cubic(p1, p2, p))
 
+        elif op == Operator.HHCURVETO:
+            if len(value) % 4 >= 1:
+                dya = value[0]
+                value = value[1:]
+            else:
+                dya = 0
+            while len(value) >= 4:
+                dxa, dxb, dyb, dxc, *_ = value
+                p1 = p + Point(dxa, dya)
+                p2 = p1 + Point(dxb, dyb)
+                p = p2 + Point(dxc, 0)
+                operators.append(Cubic(p1, p2, p))
+                dya = 0
+                value = value[4:]
+
+        elif op == Operator.VVCURVETO:
+            if len(value) % 4 >= 1:
+                dxa = value[0]
+                value = value[1:]
+            else:
+                dxa = 0
+            while len(value) >= 4:
+                dya, dxb, dyb, dyc, *_ = value
+                p1 = p + Point(dxa, dya)
+                p2 = p1 + Point(dxb, dyb)
+                p = p2 + Point(0, dyc)
+                operators.append(Cubic(p1, p2, p))
+                value = value[4:]
+                dxa = 0
+
         elif op == Operator.HVCURVETO:
             if len(value) % 8 >= 4:
                 dx1, dx2, dy2, dy3, *_ = value
                 p1 = p + Point(dx1, 0)
                 p2 = p1 + Point(dx2, dy2)
                 p = p2 + Point(0, dy3)
+                if len(value) == 5:
+                    p = p + Point(value[-1], 0)
                 operators.append(Cubic(p1, p2, p))
                 value = value[4:]
                 while len(value) >= 8:
@@ -179,6 +259,8 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
                 p1 = p + Point(0, dy1)
                 p2 = p1 + Point(dx2, dy2)
                 p = p2 + Point(dx3, 0)
+                if len(value) == 5:
+                    p = p + Point(0, value[-1])
                 operators.append(Cubic(p1, p2, p))
                 value = value[4:]
                 while len(value) >= 8:
@@ -216,123 +298,168 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
                     operators.append(Cubic(p1, p2, p))
                     value = value[8:]
 
+        elif op == Operator.HFLEX1:
+            dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6, *_ = value
+            p1 = p + Point(dx1, dy1)
+            p2 = p1 + Point(dx2, dy2)
+            p3 = p2 + Point(dx3, 0)
+            p4 = p3 + Point(dx4, 0)
+            p5 = p4 + Point(dx5, dy5)
+            p = p5 + Point(dx6, 0)
+            operators.append(Cubic(p1, p2, p3))
+            operators.append(Cubic(p4, p5, p))
+
         elif op not in [Operator.HSTEM, Operator.HINTMASK, Operator.VSTEM,
                         Operator.VSTEMHM, Operator.HSTEMHM, Operator.RETURN,
                         Operator.CNTRMASK, Operator.ENDCHAR]:
             raise NotImplementedError(f'Operator {op} not implemented')
+            warnings.warn(f'Operator {op} not implemented')
 
     if op != Operator.ENDCHAR:
         warnings.warn('Glyph has no ENDCHAR')
 
-    ymin = min(op.ymin() for op in operators)
-    ymax = max(op.ymax() for op in operators)
+    try:
+        ymin = min(op.ymin() for op in operators)
+        ymax = max(op.ymax() for op in operators)
+    except ValueError:  # no operators
+        ymin = 0
+        ymax = 0
     return operators, width, ymin, ymax
 
 
-def readcharstr(buf: bytes, cff: CFF) -> list[tuple[Union[Operator, int], Union[bytes, list[float]]]]:
-    ''' Read charstring into list of (operator, value) pairs '''
-    data: list[tuple[Union[Operator, int], Union[bytes, list[float]]]] = []
-    value: list[float] = []
-    aval: Union[None, bytes, float, list[float]]
-    key: Union[Operator, int]
-    nhints = 0
+class CharString:
+    ''' CharString reader '''
+    def __init__(self, buf: bytes, cff: CFF):
+        self.buf = buf
+        self.cff = cff
 
-    while len(buf) > 0:
-        # Operator (key)
-        if buf[0] <= 27 or 29 <= buf[0] <= 31:
-            key = buf[0]
-            i = 1
-            if buf[0] == 12:
-                key = struct.unpack_from('>H', buf)[0]
-                i = 2
+        self.stack: list[float] = []
+        self.operators: list[Union[Operator, int]] = []
+        self.operands: list[list[float]] = []
+        self.nhints = 0
+        self.readcharstr(buf)
 
-            try:
-                key = Operator(key)
-            except ValueError:
-                warnings.warn(f'Unimplemented KEY {key}')
+    def append(self, op: Operator):
+        ''' Append an operator, and clear the stack '''
+        self.operators.append(op)
+        self.operands.append(self.stack)
+        self.stack = []
 
-            if len(data) == 0:
-                # First operator can have extra width parameter.
-                # have to deduce its presence based on the
-                # operator and number of values in stack
-                if key in [Operator.CNTRMASK, Operator.ENDCHAR] and len(value) == 1:
-                    data.append((Operator.WIDTH, value))
-                    aval = [0]
-                elif ((key in [Operator.HMOVETO, Operator.VMOVETO] and len(value) > 1) or
-                      (key in [Operator.RMOVETO] and len(value) > 2)):
-                    data.append((Operator.WIDTH, value))
-                    aval = value[1:]
-                elif (key in [Operator.HSTEM, Operator.HSTEMHM, Operator.VSTEM,
-                              Operator.VSTEMHM, Operator.HINTMASK] and
-                      len(value) % 2 != 0):
-                    data.append((Operator.WIDTH, value))
-                    aval = value[1:]
-                else:
-                    aval = value
+    def addwidth(self):
+        ''' Add width operator '''
+        self.operators.append(Operator.WIDTH)
+        self.operands.append([self.stack[0]])
+        self.stack = self.stack[1:]
 
-            elif key == Operator.CALLSUBR:
-                if cff.topdict.get('charstringtype', 2) == 1:
-                    bias = 0
-                elif len(cff.localsubs) < 1240:
-                    bias = 107
-                elif len(cff.localsubs) < 33900:
-                    bias = 1131
-                else:
-                    bias = 32768
-                idx = int(value[0] + bias)
-                subchstr = cff.localsubs[idx]
-                data.extend(readcharstr(subchstr, cff))
-                value = []
-                buf = buf[i:]
-                continue
+    def extend(self, substate: CharString):
+        ''' Extend the CharString from a subroutine CharString '''
+        self.operators.extend(substate.operators)
+        self.operands.extend(substate.operands)
+        self.nhints += substate.nhints
+        self.stack = substate.stack
 
-            elif key in [Operator.HINTMASK, Operator.CNTRMASK]:
-                if data[-1][0] == Operator.HSTEMHM and len(value) > 0:
-                    # Implied VSTEM operator
-                    nhints += len(value)//2
-                    data.append((Operator.VSTEMHM, value))
-                # N-bits for the N hint masks just read in
-                hintbytes = nhints + 7 >> 3
-                aval = buf[1:hintbytes+1]
-                i = hintbytes+1
+    @property
+    def lenstack(self):
+        ''' Length of stack '''
+        return len(self.stack)
 
+    def readcharstr(self, buf: bytes):
+        ''' Read charstring bytes into operators/operands lists '''
+        key: Union[Operator, int]
+        while len(buf) > 0:
+            if buf[0] <= 27 or 29 <= buf[0] <= 31:  # Operator
+                key = buf[0]
+                nbytes = 1
+                if buf[0] == 12:
+                    key = struct.unpack_from('>H', buf)[0]
+                    nbytes = 2
+
+                try:
+                    key = Operator(key)
+                except ValueError:
+                    raise NotImplementedError(f'Unimplemented KEY {key}')
+
+                if len(self.operators) == 0:
+                    # First operator can have extra width parameter.
+                    # have to deduce its presence based on the
+                    # operator and number of values in stack
+                    if key in [Operator.CNTRMASK, Operator.ENDCHAR] and self.lenstack == 1:
+                        self.addwidth()
+                    elif ((key in [Operator.HMOVETO, Operator.VMOVETO] and self.lenstack > 1) or
+                          (key in [Operator.RMOVETO] and self.lenstack > 2)):
+                        self.addwidth()
+                    elif (key in [Operator.HSTEM, Operator.HSTEMHM, Operator.VSTEM,
+                                  Operator.VSTEMHM, Operator.HINTMASK] and
+                          self.lenstack % 2 != 0):
+                        self.addwidth()
+
+                if key in [Operator.CALLSUBR, Operator.CALLGSUBR]:
+                    if key == Operator.CALLSUBR:
+                        sublist = self.cff.localsubs
+                    else:
+                        sublist = self.cff.globalsub
+
+                    if self.cff.topdict.get('charstringtype', 2) == 1:
+                        bias = 0
+                    elif len(sublist) < 1240:
+                        bias = 107
+                    elif len(sublist) < 33900:
+                        bias = 1131
+                    else:
+                        bias = 32768
+                    idx = int(self.stack[-1] + bias)
+
+                    subchstr = sublist[idx]
+                    self.stack = self.stack[:-1]  # remove sub# from stack
+                    self.readcharstr(subchstr)
+                    buf = buf[nbytes:]
+                    continue
+
+                elif key in [Operator.HINTMASK, Operator.CNTRMASK]:
+                    if self.operators[-1] == Operator.HSTEMHM and self.lenstack > 0:
+                        # Implied VSTEM operator
+                        self.nhints += self.lenstack // 2
+                        self.append(Operator.VSTEMHM)
+                    # N-bits for the N hint masks just read in
+                    hintbytes = self.nhints + 7 >> 3
+                    self.stack = list(buf[1:hintbytes+1])
+                    nbytes = hintbytes+1
+
+                elif key in [Operator.HSTEM, Operator.HSTEMHM,
+                             Operator.VSTEM, Operator.VSTEMHM]:
+                    self.nhints += self.lenstack // 2
+
+                if key not in [Operator.RETURN]:
+                    self.append(key)
+
+            # Opearands (numeric values)
+            elif buf[0] == 28:
+                self.stack.append(struct.unpack_from('>h', buf[1:])[0])  # signed short
+                nbytes = 3
+            elif 32 <= buf[0] <= 246:
+                self.stack.append(buf[0] - 139)
+                nbytes = 1
+            elif 247 <= buf[0] <= 250:
+                self.stack.append((buf[0]-247)*256 + buf[1] + 108)
+                nbytes = 2
+            elif 251 <= buf[0] <= 254:
+                self.stack.append(-(buf[0]-251)*256 - buf[1] - 108)
+                nbytes = 2
+            elif buf[0] == 255:
+                self.stack.append(struct.unpack_from('>i', buf[1:])[0])
+                nbytes = 5
             else:
-                aval = value
+                raise ValueError('Bad encoding byte: ' + str(buf[0]))
+                self.stack.append(None)
+                nbytes = 1
 
-            if key in [Operator.HSTEM, Operator.HSTEMHM, Operator.VSTEM, Operator.VSTEMHM]:
-                nhints += len(aval)//2
-
-            data.append((key, aval))
-            value = []
-
-        # Opearand (value)
-        elif buf[0] == 28:
-            value.append(struct.unpack_from('>h', buf[1:])[0])  # signed short
-            i = 3
-        elif 32 <= buf[0] <= 246:
-            value.append(buf[0] - 139)
-            i = 1
-        elif 247 <= buf[0] <= 250:
-            value.append((buf[0]-247)*256 + buf[1] + 108)
-            i = 2
-        elif 251 <= buf[0] <= 254:
-            value.append(-(buf[0]-251)*256 - buf[1] - 108)
-            i = 2
-        elif buf == 255:
-            raise NotImplementedError # TODO REAL number
-        else:
-            raise ValueError('Bad encoding byte: ' + str(buf[0]))
-            value.append(None)
-            i = 1
-
-        buf = buf[i:]
-    return data
+            buf = buf[nbytes:]
 
 
 def readdict(buf: bytes) -> dict:
     ''' Read a CFF dictionary structure from the buffer '''
-    data: dict[Union[int, str], Union[None, list[int], int]] = {}
-    value: list[int] = []
+    data: dict[Union[int, str], Union[None, list[float], float]] = {}
+    value: list[float] = []
     key: Union[int, str]
     while len(buf) > 0:
         # Operator (key)
@@ -340,7 +467,7 @@ def readdict(buf: bytes) -> dict:
             key = buf[0]
             i = 1
             if buf[0] == 12:
-                key = '12.' + str(buf[1])
+                key = struct.unpack_from('>h', buf)[0]
                 i = 2
             if len(value) == 0:
                 data[key] = None
@@ -367,7 +494,9 @@ def readdict(buf: bytes) -> dict:
             value.append(-(buf[0]-251)*256 - buf[1] - 108)
             i = 2
         elif buf[0] == 30:
-            raise NotImplementedError # TODO - REAL number
+            v, nbytes = readreal(buf[1:])
+            value.append(v)
+            i += (nbytes+1)
         else:
             warnings.warn('Bad encoding byte: ' + str(buf[0]))
             value.append(0)
@@ -384,14 +513,14 @@ class CFF:
         self.font = font
         self.fontfile = self.font.fontfile
 
-        self.major = self.fontfile.readuint8(self.font.tables['CFF '].offset)
+        self.major = self.fontfile.readuint8(self.cffofst)
         self.minor = self.fontfile.readuint8()
         self.headsize = self.fontfile.readuint8()
         self.offsize = self.fontfile.readuint8()
-        self.names = self.readindex(self.cffofst + self.offsize)
+        self.names = self.readindex()
         topdict_bytes = self.readindex()
         self.strings = self.readindex()
-        self.globalsub = self.readindex()
+        self.globalsub: list[bytes] = self.readindex()
         self.topdicts: list[dict] = [self.read_topdict(readdict(t)) for t in topdict_bytes]
         self.set_topdict(0)
 
@@ -473,19 +602,19 @@ class CFF:
             16: ('encoding', 'number'),
             17: ('charstrings', 'number'),
             18: ('private', 'array'),
-            '12.0': ('copyright', 'sid'),
-            '12.1': ('isfixedpitch', 'number'),
-            '12.2': ('italicangle', 'number'),
-            '12.3': ('underlineposition', 'number'),
-            '12.4': ('underlinethickness', 'number'),
-            '12.5': ('painttype', 'number'),
-            '12.6': ('charstringtype', 'number'),
-            '12.7': ('fontmatrix', 'array'),
-            '12.8': ('strokewidth', 'number'),
-            '12.20': ('syntheticbase', 'number'),
-            '12.21': ('postscript', 'sid'),
-            '12.22': ('basefontname', 'sid'),
-            '12.23': ('basefontblend' 'array'),
+            0x0c00: ('copyright', 'sid'),
+            0x0c01: ('isfixedpitch', 'number'),
+            0x0c02: ('italicangle', 'number'),
+            0x0c03: ('underlineposition', 'number'),
+            0x0c04: ('underlinethickness', 'number'),
+            0x0c05: ('painttype', 'number'),
+            0x0c06: ('charstringtype', 'number'),
+            0x0c07: ('fontmatrix', 'array'),
+            0x0c08: ('strokewidth', 'number'),
+            0x0c14: ('syntheticbase', 'number'),
+            0x0c15: ('postscript', 'sid'),
+            0x0c16: ('basefontname', 'sid'),
+            0x0c17: ('basefontblend' 'array'),
             # Private Dict Keys
             6: ('bluevalues', 'array'),
             7: ('otherblues', 'array'),
@@ -496,19 +625,18 @@ class CFF:
             19: ('subrs', 'number'),
             20: ('defaultwidthx', 'number'),
             21: ('nominalwidthx', 'number'),
-            '12.9': ('bluescale', 'number'),
-            '12.10': ('blueshift', 'number'),
-            '12.11': ('bluefuzz', 'number'),
-            '12.12': ('stemsnaph', 'array'),
-            '12.13': ('stemsnaph', 'array'),
-            '12.14': ('stemsnaph', 'number'),
-            '12.17': ('languagegroup', 'number'),
-            '12.18': ('expansionfactor', 'number'),
-            '12.19': ('initialrandomseed', 'number')}
+            0x0c09: ('bluescale', 'number'),
+            0x0c0a: ('blueshift', 'number'),
+            0x0c0b: ('bluefuzz', 'number'),
+            0x0c0c: ('stemsnaph', 'array'),
+            0x0c0d: ('stemsnapv', 'array'),
+            0x0c0e: ('forcebold', 'number'),
+            0x0c11: ('languagegroup', 'number'),
+            0x0c12: ('expansionfactor', 'number'),
+            0x0c13: ('initialrandomseed', 'number')}
 
         newd = {}
         for key, value in d.items():
-            print(key, value)
             newkey, dtype = topdict_entries.get(key, (key, 'number'))
             if newkey:
                 if dtype == 'sid':
