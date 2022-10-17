@@ -44,7 +44,8 @@ class SimpleGlyph:
         if config.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
-            elm.attrib['transform'] = f'translate({fmt(x)} {fmt(y-yshift)}) scale({fmt(fntscale)})'
+            dx = self.bbox.xmin * self.emscale * fntscale
+            elm.attrib['transform'] = f'translate({fmt(x+dx)} {fmt(y-yshift)}) scale({fmt(fntscale)})'
         else:
             elm = self.svgpath(x0=x, y0=y, scale=fntscale)
         return elm

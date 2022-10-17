@@ -516,11 +516,13 @@ class Text:
                 lineglyphs.append((glyph, x))
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
                 xadvance = glyph.advance(nextglyph, kern=self.kern)
-                x += (xadvance - min(0, glyph.bbox.xmin)) * scale
+                x += xadvance * scale
 
             if glyph.bbox.xmax > xadvance:
-                # Make a bit wider to grab right edge that extends beyond advance width
+                # Make linewidth a bit wider to grab right edge
+                # that extends beyond advance width
                 x += (glyph.bbox.xmax - xadvance) * scale
+                x += (-glyphs[0].bbox.xmin) * scale
             linewidths.append(x)
             allglyphs.append(lineglyphs)
 

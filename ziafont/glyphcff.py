@@ -455,10 +455,15 @@ class CharString:
                     continue
 
                 elif key in [Operator.HINTMASK, Operator.CNTRMASK]:
-                    if self.operators[-1] == Operator.HSTEMHM and self.lenstack > 0:
+                    if (len(self.operators) > 0 and self.operators[-1] == Operator.HSTEMHM and
+                        self.lenstack > 0):
                         # Implied VSTEM operator
                         self.nhints += self.lenstack // 2
                         self.append(Operator.VSTEMHM)
+                    elif (len(self.operators) == 0 or 
+                          (len(self.operators) == 1 and self.operators[0] == Operator.WIDTH)):
+                        self.nhints += self.lenstack // 2
+                        self.append(Operator.VSTEMHM) ## ??
                     # N-bits for the N hint masks just read in
                     hintbytes = self.nhints + 7 >> 3
                     self.stack = list(buf[1:hintbytes+1])

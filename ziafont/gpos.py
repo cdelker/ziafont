@@ -185,7 +185,6 @@ class Lookup:
         elif self.type == 9:  # Extension subtable. Can be any type
             ptr = self.fontfile.tell()
             posformat = self.fontfile.readuint16()
-            assert posformat == 1
             exttype = self.fontfile.readuint16()
             extofst = self.fontfile.readuint32()
             if exttype == 2:
