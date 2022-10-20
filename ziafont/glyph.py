@@ -113,13 +113,13 @@ class SimpleGlyph:
         svg.attrib['width'] = fmt(width)
         svg.attrib['height'] = fmt(height)
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
+        svg.attrib['viewBox'] = f'{fmt(xmin)} 0 {fmt(width)} {fmt(height)}'
         if not config.svg2:
             svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
-            elm = self.svgpath(x0=xmin, y0=base, scale=scale)
+            elm = self.svgpath(x0=0, y0=base, scale=scale)
             if elm is not None:
                 svg.append(elm)
         else:
-            svg.attrib['viewBox'] = f'{fmt(xmin)} 0 {fmt(width)} {fmt(height)}'
             symbol = self.svgsymbol()
             svg.append(symbol)
             g = ET.SubElement(svg, 'use')
@@ -219,10 +219,10 @@ class TestGlyph:
                 circ = ET.SubElement(svg, 'circle')
                 circ.attrib['cx'] = fmt(p.x * scale)
                 circ.attrib['cy'] = fmt(base-p.y * scale)
-                circ.attrib['r'] = f'{fmt(fontsize*scale/3)}'
+                circ.attrib['r'] = f'{fmt(min(3, fontsize*scale/3))}'
                 circ.attrib['fill'] = 'none' if c else 'blue'
                 circ.attrib['stroke'] = 'blue'
-                circ.attrib['opacity'] = '0.3'
+                circ.attrib['opacity'] = '0.4'
 
         return svg
 

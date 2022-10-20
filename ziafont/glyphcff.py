@@ -352,7 +352,6 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
                         Operator.VSTEMHM, Operator.HSTEMHM, Operator.RETURN,
                         Operator.CNTRMASK, Operator.ENDCHAR]:
             raise NotImplementedError(f'Operator {op} not implemented')
-            warnings.warn(f'Operator {op} not implemented')
 
     if op != Operator.ENDCHAR:
         warnings.warn('Glyph has no ENDCHAR')
@@ -389,13 +388,6 @@ class CharString:
         self.operators.append(Operator.WIDTH)
         self.operands.append([self.stack[0]])
         self.stack = self.stack[1:]
-
-    def extend(self, substate: CharString):
-        ''' Extend the CharString from a subroutine CharString '''
-        self.operators.extend(substate.operators)
-        self.operands.extend(substate.operands)
-        self.nhints += substate.nhints
-        self.stack = substate.stack
 
     @property
     def lenstack(self):

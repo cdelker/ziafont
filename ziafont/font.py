@@ -407,7 +407,7 @@ class Text:
 
     def _drawon(self, svg: ET.Element, x: float = 0, y: float = 0):
         ''' Draw text on the SVG '''
-        word, symbols, width, ymin, ymax = self._symbols
+        word, symbols, width, xmin, ymin, ymax = self._symbols
         height = ymax-ymin
         # Adjust vertical alignment
         yofst = {'base': 0,
@@ -446,7 +446,7 @@ class Text:
             circ.attrib['r'] = '3'
             circ.attrib['fill'] = 'red'
             circ.attrib['stroke'] = 'red'
-        bbox = (xy[0], xy[0]+width, xy[1]+ymin, xy[1]+ymax)
+        bbox = (xy[0]+xmin, xy[0]+width, xy[1]+ymin, xy[1]+ymax)
 
         if self.rotation:
             centerx = xy[0]  # Center of rotation
@@ -506,10 +506,12 @@ class Text:
         symbols: list[ET.Element] = []  # <symbol> elements
         linewidths: list[float] = []
         allglyphs = []  # (glyph, x) where x is left aligned
+        xmin = 0
         for lineidx, line in enumerate(lines):
             lineglyphs = []
             glyphs = [self.font.glyph(c) for c in line]
             x = 0
+            xmin = min(xmin, glyphs[0].bbox.xmin*scale)
             for gidx, glyph in enumerate(glyphs):
                 if glyph.id not in [s.attrib['id'] for s in symbols]:
                     symbols.append(glyph.svgsymbol())
@@ -548,7 +550,7 @@ class Text:
 
         if not config.svg2:
             symbols = []
-        return Symbols(word, symbols, totwidth, ymin, ymax)
+        return Symbols(word, symbols, totwidth, xmin, ymin, ymax)
 
     def getsize(self) -> tuple[float, float]:
         ''' Calculate width and height (including ascent/descent) of string '''

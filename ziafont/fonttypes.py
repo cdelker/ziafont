@@ -19,4 +19,4 @@ FontInfo = namedtuple(
 
 GlyphComp = namedtuple('GlyphComp', ['glyphs', 'xforms', 'bbox'])
 Xform = namedtuple('Xform', ['a', 'b', 'c', 'd', 'e', 'f', 'match'])
-Symbols = namedtuple('Symbols', ['word', 'symbols', 'width', 'ymin', 'ymax'])
+Symbols = namedtuple('Symbols', ['word', 'symbols', 'width', 'xmin', 'ymin', 'ymax'])
