@@ -105,13 +105,12 @@ def read_glyph_cff(glyphid: int, font: Font) -> SimpleGlyph:
         font.cffdata = CFF(font)
 
     charstr = font.cffdata.charstr_index[glyphid]
-    ops, width, ymin, ymax = charstr2path(charstr, font.cffdata)
-    bbox = BBox(0, width, ymin, ymax)
+    ops, width, bbox = charstr2path(charstr, font.cffdata)
     glyph = SimpleGlyph(glyphid, ops, bbox, font)
     return glyph
 
 
-def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, float, float]:
+def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, BBox]:
     ''' Convert the charstring operators into SVG path elements '''
     operators: list[SVGOpType] = []
     width = cff.defaultwidth
@@ -357,12 +356,13 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, floa
         warnings.warn('Glyph has no ENDCHAR')
 
     try:
+        xmin = min(op.xmin() for op in operators)
+        xmax = max(op.xmax() for op in operators)
         ymin = min(op.ymin() for op in operators)
         ymax = max(op.ymax() for op in operators)
     except ValueError:  # no operators
-        ymin = 0
-        ymax = 0
-    return operators, width, ymin, ymax
+        ymin = ymax = xmin = xmax = 0
+    return operators, width, BBox(xmin, xmax, ymin, ymax)
 
 
 class CharString:

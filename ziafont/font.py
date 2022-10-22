@@ -14,11 +14,12 @@ import warnings
 from .config import config
 from .fontread import FontReader
 from . import gpos
+from . import gsub
 from .cmap import Cmap12, Cmap4
 from .glyph import SimpleGlyph, CompoundGlyph
 from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
-from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols
+from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols, FontFeatures
 from .svgpath import fmt
 
 
@@ -42,6 +43,7 @@ class Font:
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
 
+        self.features = FontFeatures()
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
         self._glyphids: Dict[str, int] = {}
@@ -59,6 +61,10 @@ class Font:
         self.gpos = None
         if 'GPOS' in self.tables:
             self.gpos = gpos.Gpos(self.tables['GPOS'].offset, self.fontfile)
+
+        self.gsub = None
+        if 'GSUB' in self.tables:
+            self.gsub = gsub.Gsub(self.tables['GSUB'].offset, self.fontfile)
 
         return info
 
@@ -263,6 +269,41 @@ class Font:
         ''' Select cmap table by index. Only supported tables are included. '''
         self.cmap = self.cmaps[cmapidx]
 
+    def scripts(self):
+        ''' Get list of scripts in the font '''
+        if self.gpos:
+            scripts = list(self.gpos.scripts.keys())
+        elif self.gsub:
+            scripts = list(self.gsub.scripts.keys())
+        else:
+            scripts = []
+        return scripts
+
+    def languages(self, script='DFLT'):
+        ''' Get list of languages in the script '''
+        s = None
+        langs = []
+        if self.gpos:
+            s = self.gpos.scripts.get(script, None)
+        elif self.gsub:
+            s = self.gsub.scripts.get(script, None)
+        if s is not None:
+            langs = list(s.languages.keys())
+        return langs    
+       
+    def language(self, script, language):
+        ''' Set script/language to use '''
+        if script not in self.scripts():
+            raise ValueError(f'Script {script} not defined in font')
+        if language not in self.languages(script):
+            raise ValueError(f'Language {language} not defined in font')
+        if self.gpos:
+            self.gpos.language.script = script
+            self.gpos.language.language = language
+        if self.gsub:
+            self.gsub.language.script = script
+            self.gsub.language.language = language
+
     def glyphindex(self, char: str) -> int:
         ''' Get index of character glyph '''
         gid = self._glyphids.get(char)
@@ -291,14 +332,16 @@ class Font:
             self._glyphs[glyphid] = glyph
         return glyph
 
-    def advance(self, glyph1: int, glyph2: int = None, kern: bool = True):
-        ''' Get advance width in font units, including kerning adjustment if glyph2 is defined '''
+    def advance(self, glyph1: int, glyph2: int = None):
+        ''' Get advance width in font units, including kerning adjustment
+            if glyph2 is defined
+        '''
         try:
             adv = self.advwidths[glyph1].width
         except IndexError:
             adv = self.info.layout.advwidthmax.width
 
-        if kern and glyph2 and self.gpos:
+        if self.features.kern and glyph2 and self.gpos:
             # Only getting x-advance for first glyph.
             adv += self.gpos.kern(glyph1, glyph2)[0].get('xadvance', 0)
         return adv
@@ -315,8 +358,7 @@ class Font:
              valign: Literal['base', 'center', 'top']='base',
              color: str=None,
              rotation: float=0,
-             rotation_mode: str='anchor',
-             kern=True):
+             rotation_mode: str='anchor'):
         ''' Create a Text object using this font
 
             Args:
@@ -333,8 +375,7 @@ class Font:
                 kern: Use font kerning adjustment
         '''
         txt = Text(s, self, size=size, linespacing=linespacing, halign=halign, valign=valign,
-                   color=color, kern=kern, rotation=rotation,
-                   rotation_mode=rotation_mode)
+                   color=color, rotation=rotation, rotation_mode=rotation_mode)
         return txt
 
 
@@ -353,7 +394,6 @@ class Text:
             rotation_mode: Either 'default' or 'anchor', to
                 mimic Matplotlib behavoir. See:
                 https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
-            kern: Use kerning adjustment
     '''
     def __init__(self, s: str,  font: Union[str, Font] = None,
                  size: float = None, linespacing: float = 1,
@@ -361,8 +401,7 @@ class Text:
                  valign: Literal['base', 'center', 'top'] = 'base',
                  color: str = None,
                  rotation: float = 0,
-                 rotation_mode: str = 'anchor',
-                 kern: bool = True):
+                 rotation_mode: str = 'anchor'):
         self.str = s
         self.halign = halign
         self.valign = valign
@@ -371,7 +410,6 @@ class Text:
         self.rotation_mode = rotation_mode
         self.size = size if size else config.fontsize
         self.linespacing = linespacing
-        self.kern = kern
         if font is None or isinstance(font, str):
             self.font = Font(font)
         else:
@@ -509,7 +547,11 @@ class Text:
         xmin = 0
         for lineidx, line in enumerate(lines):
             lineglyphs = []
-            glyphs = [self.font.glyph(c) for c in line]
+            glyphids = [self.font.glyphindex(c) for c in line]
+            if self.font.gsub:
+                glyphids = self.font.gsub.sub(glyphids, self.font.features)
+            
+            glyphs = [self.font.glyph_fromid(gid) for gid in glyphids]
             x = 0
             xmin = min(xmin, glyphs[0].bbox.xmin*scale)
             for gidx, glyph in enumerate(glyphs):
@@ -517,7 +559,7 @@ class Text:
                     symbols.append(glyph.svgsymbol())
                 lineglyphs.append((glyph, x))
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
-                xadvance = glyph.advance(nextglyph, kern=self.kern)
+                xadvance = glyph.advance(nextglyph)
                 x += xadvance * scale
 
             if glyph.bbox.xmax > xadvance:

@@ -63,6 +63,14 @@ class Moveto:
         ''' Maximum Y value '''
         return self.p.y
 
+    def xmin(self) -> float:
+        ''' Minimum X value '''
+        return self.p.x
+
+    def xmax(self) -> float:
+        ''' Maximum X value '''
+        return self.p.x
+
     def points(self) -> tuple[list[Point], list[bool]]:
         ''' Get control points '''
         return [self.p], [False]  # [points], [control?]
@@ -92,6 +100,14 @@ class Lineto:
     def ymax(self) -> float:
         ''' Maximum Y value '''
         return self.p.y
+
+    def xmin(self) -> float:
+        ''' Minimum X value '''
+        return self.p.x
+
+    def xmax(self) -> float:
+        ''' Maximum X value '''
+        return self.p.x
 
     def points(self) -> tuple[list[Point], list[bool]]:
         ''' Get control points '''
@@ -127,6 +143,14 @@ class Quad:
     def ymax(self) -> float:
         ''' Maximum Y value '''
         return max(self.p1.y, self.p2.y)
+
+    def xmin(self) -> float:
+        ''' Minimum X value '''
+        return min(self.p1.x, self.p2.x)
+
+    def xmax(self) -> float:
+        ''' Maximum X value '''
+        return max(self.p1.x, self.p2.x)
 
     def points(self) -> tuple[list[Point], list[bool]]:
         ''' Get control points '''
@@ -164,6 +188,14 @@ class Cubic:
     def ymax(self) -> float:
         ''' Maximum Y value '''
         return max(self.p1.y, self.p2.y, self.p3.y)
+
+    def xmin(self) -> float:
+        ''' Minimum X value '''
+        return min(self.p1.x, self.p2.x, self.p3.x)
+
+    def xmax(self) -> float:
+        ''' Maximum X value '''
+        return max(self.p1.x, self.p2.x, self.p3.x)
 
     def points(self) -> tuple[list[Point], list[bool]]:
         ''' Get control points '''

@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 from typing import Optional
+import logging
 from collections import namedtuple
+from dataclasses import dataclass
 
 from .fontread import FontReader
+
+
+@dataclass
+class Language:
+    ''' Font script and language '''
+    script: str = 'latn'
+    language: str = ''  # Default
 
 
 class Gpos:
@@ -12,6 +21,7 @@ class Gpos:
     def __init__(self, ofst: int, fontfile: FontReader):
         self.ofst = ofst
         self.fontfile = fontfile
+        self.language = Language()
         self.fontfile.seek(self.ofst)
 
         self.vermajor = self.fontfile.readuint16()
@@ -52,19 +62,19 @@ class Gpos:
                 self.fontfile.readuint16() + lookuplisttableloc,
                 self.fontfile))
 
-    def kern(self, glyph1: int, glyph2: int, script:
-             str=None, lang: str=None) -> tuple[Optional[dict], Optional[dict]]:
+    def kern(self, glyph1: int, glyph2: int) -> tuple[Optional[dict], Optional[dict]]:
         ''' Get kerning adjustmnet for glyph1 and glyph2 '''
-        scr = self.scripts.get(script, self.scripts.get('DFLT', self.scripts.get('latn')))  # type: ignore
+        scr = self.scripts.get(self.language.script, self.scripts.get('DFLT'))
         if scr is None:
             return {}, {}
-        langsys = scr.languages.get(lang, scr.languages.get('DFLT'))  # type: ignore
+        langsys = scr.languages.get(self.language.language, scr.languages.get(''))
         if langsys is None:
             return {}, {}
-
+        
         # Find kerning features in features list
         usefeatures = [self.features[i] for i in langsys.featureidxs]  # type: ignore
         featnames = [f.tag for f in usefeatures]
+        tables = []
         if 'kern' in featnames:
             lookups = usefeatures[featnames.index('kern')].lookupids
             tables = [self.lookups[i] for i in lookups]
@@ -91,8 +101,8 @@ class Script:
         self.languages = {}
 
         if self.defaultLangSysOfst:
-            self.languages['DFLT'] = LanguageSystem(
-                'DFLT',
+            self.languages[''] = LanguageSystem(
+                '',
                 self.defaultLangSysOfst + self.ofst,
                 self.fontfile)
 
@@ -192,7 +202,7 @@ class Lookup:
                     ptr + extofst,
                     self.fontfile))
         else:
-            pass ## print('Lookup', self.type)
+            logging.debug(f'Unimplemented GPOS Lookup Type {self.type}')
 
         self.fontfile.seek(fileptr)  # Put file pointer back
 
@@ -284,6 +294,12 @@ class PairAdjustmentTable:
         return f'<PairAdjustmentTable {hex(self.ofst)}>'
 
 
+class NoCoverage:
+    ''' Empty coverage table '''
+    def covidx(self, glyph: int) -> Optional[int]:
+        return None
+
+    
 class Coverage:
     ''' Coverage Table - defines which glyphs apply to this lookup
 
@@ -319,7 +335,7 @@ class Coverage:
                         self.fontfile.readuint16(),
                         self.fontfile.readuint16()))
             else:
-                raise ValueError('Bad coverage table format')
+                raise ValueError(f'Bad coverage table format {self.format}')
 
             self.fontfile.seek(fileptr)  # Put file pointer back
 

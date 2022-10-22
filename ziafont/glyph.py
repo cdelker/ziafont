@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from .font import Font
 
 
-    
 class SimpleGlyph:
     ''' Simple Glyph '''
     dfltsize = 12   # Draw <symbols> in this point size
@@ -44,17 +43,17 @@ class SimpleGlyph:
         if config.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
-            dx = self.bbox.xmin * self.emscale * fntscale
+            dx = min(self.bbox.xmin * self.emscale * fntscale, 0)
             elm.attrib['transform'] = f'translate({fmt(x+dx)} {fmt(y-yshift)}) scale({fmt(fntscale)})'
         else:
             elm = self.svgpath(x0=x, y0=y, scale=fntscale)
         return elm
 
-    def advance(self, nextchr=None, kern=True):
+    def advance(self, nextchr=None):
         ''' Get advance width in glyph units, including kerning if nextchr is defined '''
         if nextchr:
             nextchr = nextchr.index
-        return self.font.advance(self.index, nextchr, kern=kern)
+        return self.font.advance(self.index, nextchr)
 
     def svgpath(self, x0: float = 0, y0: float = 0, scale: float = 1) -> Optional[ET.Element]:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
@@ -70,7 +69,7 @@ class SimpleGlyph:
     def svgsymbol(self) -> ET.Element:
         ''' Get svg <symbol> element for this glyph, scaled to 12-point font '''
         xmin = min(self.bbox.xmin * self.emscale, 0)
-        xmax = self.bbox.xmax
+        xmax = self.bbox.xmax * self.emscale
         width = xmax-xmin
         ymax = max(self.font.info.layout.ymax, self.bbox.ymax) * self.emscale
         ymin = min(self.font.info.layout.ymin, self.bbox.ymin) * self.emscale
