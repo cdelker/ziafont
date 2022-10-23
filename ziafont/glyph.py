@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from .fonttypes import GlyphComp, BBox
 from .config import config
 from .svgpath import fmt, SVGOpType
+from .glyphinspect import InspectGlyph, DescribeGlyph
 
 if TYPE_CHECKING:
     from .font import Font
@@ -20,8 +21,7 @@ class SimpleGlyph:
     dfltsize = 12   # Draw <symbols> in this point size
 
     def __init__(self, index: int, operators: Sequence[SVGOpType],
-                 bbox: BBox, font: Font, char: str = None):
-        self.char = char
+                 bbox: BBox, font: Font):
         self.index = index
         self.operators = operators
         self.bbox = bbox
@@ -35,6 +35,13 @@ class SimpleGlyph:
     def _repr_svg_(self):
         return ET.tostring(self.svgxml(), encoding='unicode')
 
+    @property
+    def char(self) -> set[str]:
+        ''' Get set of unicode character represented by this glyph '''
+        if self.font.cmap:
+            return self.font.cmap.char(self.index)
+        return set()
+    
     def place(self, x: float, y: float, fontsize: float) -> Optional[ET.Element]:
         ''' Get <use> svg tag translated/scaled to the right position '''
         fntscale = (fontsize/self.dfltsize)
@@ -60,9 +67,12 @@ class SimpleGlyph:
         emscale = self.emscale * scale
         path = ''
         for i, op in enumerate(self.operators):
-            path += op.path(x0, y0, scale=emscale)
+            segment = op.path(x0, y0, scale=emscale)
+            if segment[0] == 'M' and path != '':
+                path += 'Z '  # Close intermediate segments
+            path += segment
         if path == '':
-            return None
+            return None  # Don't return empty path
         path += 'Z '
         return ET.Element('path', attrib={'d': path})
 
@@ -126,19 +136,22 @@ class SimpleGlyph:
             g.attrib['transform'] = f'translate({fmt(xmin)}, {fmt(base-ymax)}) scale({fmt(scale)})'
         return svg
 
-    def test(self) -> 'TestGlyph':
+    def test(self, pxwidth: float=400, pxheight: float=400) -> InspectGlyph:
         ''' Get Glyph Test representation showing vertices and borders '''
-        return TestGlyph(self)
+        return InspectGlyph(self, pxwidth, pxheight)
+
+    def describe(self) -> DescribeGlyph:
+        ''' Get Glyph Test representation showing vertices and borders '''
+        return DescribeGlyph(self)
 
 
 class CompoundGlyph(SimpleGlyph):
     ''' Compound glyph, made of multiple other Glyphs '''
-    def __init__(self, index: int, glyphs: GlyphComp, font: Font, char: str = None):
-        self.char = char
+    def __init__(self, index: int, glyphs: GlyphComp, font: Font):
         self.index = index
         self.glyphs = glyphs
         operators = self._buildcompound()
-        super().__init__(index, operators, self.glyphs.bbox, font, char)
+        super().__init__(index, operators, self.glyphs.bbox, font)
 
     def _buildcompound(self) -> list[SVGOpType]:
         ''' Combine multiple glyphs into one set of contours '''
@@ -156,74 +169,6 @@ class CompoundGlyph(SimpleGlyph):
                                            xform.d, xform.e, xform.f, m, n))
         return xoperators
 
-
-class TestGlyph:
-    ''' Draw glyph svg with test/debug lines '''
-    def __init__(self, glyph: SimpleGlyph):
-        self.glyph = glyph
-
-    def _repr_svg_(self):
-        ''' Jupyter representation '''
-        return self.svg()
-
-    def svg(self, fontsize: float = None) -> str:
-        ''' Glyph SVG string '''
-        return ET.tostring(self.svgxml(fontsize), encoding='unicode')
-
-    def svgxml(self, fontsize: float = None) -> ET.Element:
-        ''' Glyph svg as XML element tree '''
-        fontsize = fontsize if fontsize else config.fontsize
-        svg = self.glyph.svgxml(fontsize)
-        scale = fontsize / self.glyph.font.info.layout.unitsperem
-        xmin = min(self.glyph.bbox.xmin * scale, 0)
-        xmax = self.glyph.bbox.xmax * scale
-        ymin = min(self.glyph.bbox.ymin, self.glyph.font.info.layout.ymin) * scale
-        ymax = max(self.glyph.bbox.ymax, self.glyph.font.info.layout.ymax) * scale
-        width = xmax - xmin
-        height = ymax - ymin
-        base = ymax  # = height - ymin
-
-        # Borders and baselines
-        path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {fmt(xmin)} {fmt(base)} L {fmt(width)} {fmt(base)}'
-        path.attrib['stroke'] = 'red'
-
-        ascent = base - self.glyph.font.info.layout.ascent * scale
-        descent = base - self.glyph.font.info.layout.descent * scale
-        path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {fmt(xmin)} {fmt(ascent)} L {fmt(width)} {fmt(ascent)}'
-        path.attrib['stroke'] = 'gray'
-        path.attrib['stroke-dasharray'] = '2 2'
-        path = ET.SubElement(svg, 'path')
-        path.attrib['d'] = f'M {fmt(xmin)} {fmt(descent)} L {fmt(width)} {fmt(descent)}'
-        path.attrib['stroke'] = 'gray'
-        path.attrib['stroke-dasharray'] = '2 2'
-        rect = ET.SubElement(svg, 'rect')
-        rect.attrib['x'] = '0'
-        rect.attrib['y'] = '0'
-        rect.attrib['width'] = fmt(xmax)
-        rect.attrib['height'] = fmt(height)
-        rect.attrib['fill'] = 'none'
-        rect.attrib['stroke'] = 'blue'
-        rect.attrib['stroke-dasharray'] = '2 2'
-        circ = ET.SubElement(svg, 'circle')
-        circ.attrib['cx'] = '0'
-        circ.attrib['cy'] = fmt(base)
-        circ.attrib['r'] = '3'
-        circ.attrib['fill'] = 'red'
-
-        for op in self.glyph.operators:
-            points, ctrls = op.points()
-            for p, c in zip(points, ctrls):
-                circ = ET.SubElement(svg, 'circle')
-                circ.attrib['cx'] = fmt(p.x * scale)
-                circ.attrib['cy'] = fmt(base-p.y * scale)
-                circ.attrib['r'] = f'{fmt(min(3, fontsize*scale/3))}'
-                circ.attrib['fill'] = 'none' if c else 'blue'
-                circ.attrib['stroke'] = 'blue'
-                circ.attrib['opacity'] = '0.4'
-
-        return svg
 
 
 class EmptyGlyph(SimpleGlyph):

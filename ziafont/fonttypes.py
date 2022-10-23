@@ -8,7 +8,7 @@ AdvanceWidth = namedtuple('AdvanceWidth', ['width', 'leftsidebearing'])
 Header = namedtuple(
     'Header', ['version', 'revision', 'checksumadjust', 'magic', 'flags',
                'created', 'modified', 'macstyle', 'lowestrecppem',
-               'directionhint', 'indextolocformat', 'glyphdataformat', 'numlonghormetrics'])
+               'directionhint', 'indextolocformat', 'glyphdataformat', 'numlonghormetrics', 'numglyphs'])
 FontNames = namedtuple('FontNames', ['copyright', 'family', 'subfamily', 'unique', 'name', 'nameversion',
                        'postscript', 'trademark', 'manufacturer', 'designer',
                        'description', 'vendorurl', 'designerurl', 'license', 'LicenseURL'])

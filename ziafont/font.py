@@ -141,15 +141,17 @@ class Font:
             self.fontfile.readint16()  # Skip reserved
         metricformat = self.fontfile.readint16()
         numlonghormetrics = self.fontfile.readuint16()
-
         advwidth = AdvanceWidth(advwidthmax, minleftbearing)
+
+        self.fontfile.readuint32(self.tables['maxp'].offset)
+        numglyphs = self.fontfile.readuint16()
 
         layout = Layout(unitsperem, xmin, xmax, ymin, ymax, ascent, descent,
                         advwidth, minleftbearing, minrightbearing)
         header = Header(version, revision, chksumadjust, magic, flags,
                         created, modified, macstyle,
                         lowestrecppem, directionhint, indextolocformat,
-                        glyphdataformat, numlonghormetrics)
+                        glyphdataformat, numlonghormetrics, numglyphs)
         return header, layout
 
     def _readnames(self) -> FontNames:
