@@ -31,14 +31,19 @@ Alternatively, the `svgsymbol` method wraps the <path> in an SVG <symbol> elemen
 Test Mode
 ---------
 
-In addition to the glyph symbol, each glyph contains information about its bounding box.
-To view the bounding box and baseline of a glyph, use the `test` method:
+To view the control points of a glyph path, use the `test` method:
 
 .. jupyter-execute::
 
     font.glyph('p').test()
 
 Notice how some glyphs can extend below the baseline (red).
+Additional glyph information can be displayed:
+
+.. jupyter-execute::
+
+    font.glyph('p').describe()
+
 
 |
 

@@ -13,14 +13,7 @@ The font name must be a path to a ttf or otf font file.
 If no font name is specified, a built-in font will be used.
 
 Strings can be converted to SVG using :py:class:`ziafont.font.Text` objects. This object provides a Jupyter representation of the string drawn as SVG, but also has methods for getting the SVG as text or as an XML element.
-Running the following line in a Jupyter cell displays the rendered string.
-
-.. jupyter-execute::
-
-    ziafont.Text('Example', font=font)
-
-
-Alternatively, Texts object can be created directly from the :py:meth:`ziafont.font.Font.text` method of a Font:
+Running the :py:meth:`ziafont.font.Font.text` method in a Jupyter cell creates a Text object and displays the rendered string.
 
 .. jupyter-execute::
 
@@ -77,18 +70,64 @@ Multi-line strings (containing `\\n` characters) can be drawn. Use `halign` to s
 
 |
 
+Features
+--------
+
+The :py:meth:`ziafont.Font.features` attribute is used to enable certain typesetting features, such as kerning adjustment and ligature replacement.
+
+
 Kerning
--------
+*******
 
-If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/opentype/spec/gpos>`_ table, with pair-positioning adjustment, kerning adjustment will be applied to control spacing between individual glyphs. This can be disabled by setting `kern=False`. See the difference in this example:
-
-.. jupyter-execute::
-
-    font.text('VALVES', kern=True)
+If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/opentype/spec/gpos>`_ table, with pair-positioning adjustment, kerning adjustment will be applied to control spacing between individual glyphs.
+This can be disabled by setting `font.features.kern=False`. See the difference in this example:
 
 .. jupyter-execute::
 
-    font.text('VALVES', kern=False)
+    font = ziafont.Font()
+    font.features.kern = False
+    font.text('Type')
+
+.. jupyter-execute::
+
+    font.features.kern = True
+    font.text('Type')
+
+
+Ligatures
+*********
+
+In some fonts, multiple glyphs may be drawn with a single ligature glyph, common in combinations such as "ff" or "fl".
+Ligature substitution will be applied by default if the font contains ligature data in a `"GSUB" <https://docs.microsoft.com/en-us/typography/opentype/spec/gsub>`_ table.
+It can be disabled by setting `font.features.liga=False`. 
+
+
+.. jupyter-execute::
+
+    font.features.liga = False
+    font.text('waffle')
+
+.. jupyter-execute::
+
+    font.features.liga = True
+    font.text('waffle')
+
+
+Stylistic Alternatives
+**********************
+
+Some fonts include alternative glyphs for some characters. Enable the alternatives with `font.features.salt=True`.
+
+.. jupyter-execute::
+
+    font.features.salt = True
+    font.text('all')
+
+.. jupyter-execute::
+
+    font.features.salt = False
+    font.text('all')
+
 
 |
 

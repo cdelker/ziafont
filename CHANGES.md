@@ -3,6 +3,8 @@
 ### 0.5 - IN PROGRESS
 
 - Added support for CFF font table (usually .otf fonts)
+- Implemented ligature substitution and partial support for GSUB table
+- Enhanced glyph.test() mode
 - Fix index errors when reading some fonts
 - Only specify font by filename
 - Strip empty path elements from SVG

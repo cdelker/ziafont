@@ -53,6 +53,7 @@ class InspectGlyph:
         tick = width/50
 
         svg = ET.Element('svg')
+        svg.set('xmlns', 'http://www.w3.org/2000/svg')
         svg.set('viewBox', f'0 0 {fmt(width)} {fmt(height)}')
         svg.set('width', fmt(self.pxwidth))
         svg.set('height', fmt(self.pxheight))
@@ -113,7 +114,7 @@ class InspectGlyph:
         text.set('font-size', txtsize)
         text.set('text-anchor', 'middle')
         text.set('alignment-baseline', 'top')
-        text.text = str(int(x1))
+        text.text = str(int(xadvance))
 
         # Glyph Outline
         g = self.glyph.svgpath(x0=x0, y0=baseline,
