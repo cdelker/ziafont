@@ -3,6 +3,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from collections import namedtuple
+import random
 import logging
 
 from .gpos import Script, Feature, Coverage, Language, ClassDef
@@ -22,7 +23,7 @@ class LookupSubtable:
         self.ofst = ofst
         self.fontfile = fontfile
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         logging.debug(f'Glyph substitution from unimplemented GSUB subtable type {self.ofst}')
         return glyphids
@@ -31,13 +32,14 @@ class LookupSubtable:
 class LookupSingleSub1(LookupSubtable):
     ''' GSUB Single Glyph Substitution  (LookupType 1, format 1) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.fmt = fontfile.readuint16(ofst)
         assert self.fmt == 1
         covofst = fontfile.readuint16()
         self.deltagid = fontfile.readint16()
         self.covtable = Coverage(ofst + covofst, fontfile)
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         for i in range(len(glyphids)):
             covidx = self.covtable.covidx(glyphids[i])
@@ -49,6 +51,7 @@ class LookupSingleSub1(LookupSubtable):
 class LookupSingleSub2(LookupSubtable):
     ''' GSUB Single Glyph Substitution  (LookupType 1, format 2) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.fmt = fontfile.readuint16(ofst)
         assert self.fmt == 2
         covofst = fontfile.readuint16()
@@ -58,7 +61,7 @@ class LookupSingleSub2(LookupSubtable):
             self.subglyphids.append(fontfile.readuint16())
         self.covtable = Coverage(ofst + covofst, fontfile)
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         for i in range(len(glyphids)):
             covidx = self.covtable.covidx(glyphids[i])
@@ -67,9 +70,46 @@ class LookupSingleSub2(LookupSubtable):
         return glyphids
 
 
+class LookupAlternate(LookupSubtable):
+    ''' GSUB Alternate Glyph Substitution  (LookupType 3) '''
+    def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
+        self.fmt = fontfile.readuint16(ofst)
+        assert self.fmt == 1
+        covofst = fontfile.readuint16()
+        cnt = fontfile.readuint16()
+        altofsts = []
+        for i in range(cnt):
+            altofsts.append(fontfile.readuint16())
+        self.altglyphs = []
+        for altofst in altofsts:
+            cnt = self.fontfile.readuint16(ofst+altofst)
+            gids = []
+            for i in range(cnt):
+                gids.append(self.fontfile.readuint16())
+            self.altglyphs.append(gids)
+        self.covtable = Coverage(ofst + covofst, fontfile)
+
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
+        ''' Apply glyph substitution to list of glyph ids '''
+        for i in range(len(glyphids)):
+            covidx = self.covtable.covidx(glyphids[i])
+            if covidx is not None:
+
+                if name == 'rand':
+                    glyphids[i] = random.choice(self.altglyphs[covidx])
+                else:
+                    # TODO - user choice!
+                    altgids = ', '.join(str(c) for c in self.altglyphs[covidx])
+                    logging.debug(f'Alternate glyphs for id {glyphids[i]}: {altgids}')
+
+        return glyphids
+
+
 class LookupLigatureSub(LookupSubtable):
     ''' Ligature Substitution Subtable (LookupType 4) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.ofst = ofst
         self.fontfile = fontfile
         fmt = fontfile.readuint16(self.ofst)
@@ -99,7 +139,7 @@ class LookupLigatureSub(LookupSubtable):
             self.ligsets.append(ligs)
         self.covtable = Coverage(self.ofst+covofst, self.fontfile)
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         newgids = []
         i = 0
@@ -126,6 +166,7 @@ class LookupLigatureSub(LookupSubtable):
 class LookupChainedSub3(LookupSubtable):
     ''' Chained Contexts Subtable (LookupType 6, format 3) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.ofst = ofst
         self.fontfile = fontfile
         self.fmt = self.fontfile.readuint16(self.ofst)
@@ -159,7 +200,7 @@ class LookupChainedSub3(LookupSubtable):
         for lofst in lookofsts:
             self.lookaheadCoverage.append(Coverage(self.ofst+lofst, self.fontfile))
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         ilen = len(self.inptCoverage)
         i = len(self.backCoverage)
@@ -190,6 +231,7 @@ class LookupChainedSub3(LookupSubtable):
 class LookupChainedSub2(LookupSubtable):
     ''' Chained Contexts Subtable (LookupType 6, format 2) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.ofst = ofst
         self.fontfile = fontfile
         self.fmt = fontfile.readuint16(self.ofst)
@@ -239,7 +281,7 @@ class LookupChainedSub2(LookupSubtable):
         self.inputClass = ClassDef(self.ofst+inputofst, self.fontfile)
         self.lookaheadClass = ClassDef(self.ofst+lookaheadofst, self.fontfile)
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         i = 0
         while i < len(glyphids):
@@ -275,6 +317,7 @@ class LookupChainedSub2(LookupSubtable):
 class LookupChainedSub1(LookupSubtable):
     ''' Chained Contexts Subtable (LookupType 6, format 1) '''
     def __init__(self, ofst: int, fontfile: FontReader):
+        super().__init__(ofst, fontfile)
         self.ofst = ofst
         self.fontfile = fontfile
         self.fmt = fontfile.readuint16(self.ofst)
@@ -315,7 +358,7 @@ class LookupChainedSub1(LookupSubtable):
             self.rules.append(ruleset)
         self.covtable = Coverage(self.ofst+covofst, self.fontfile)
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         i = 0
         while i < len(glyphids):
@@ -383,6 +426,10 @@ class GSUBLookup:
                     self.subtables.append(
                         LookupSingleSub2(self.ofst+self.tableofsts[i], self.fontfile))
 
+            elif self.type == 3:  # Alternates lookup
+                self.subtables.append(
+                    LookupAlternate(self.ofst+self.tableofsts[i], self.fontfile))
+                    
             elif self.type == 4:  # Ligature sub
                 self.subtables.append(
                     LookupLigatureSub(self.ofst+self.tableofsts[i], self.fontfile))
@@ -406,10 +453,10 @@ class GSUBLookup:
     def __repr__(self):
         return f'<GSUBLookup Type {self.type}>'
 
-    def sub(self, glyphids: list[int], lookups: list[GSUBLookup]) -> list[int]:
+    def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: str=None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
         for subtable in self.subtables:
-            glyphids = subtable.sub(glyphids, lookups)
+            glyphids = subtable.sub(glyphids, lookups, name)
         return glyphids
 
 
@@ -443,9 +490,9 @@ class Gsub:
         # Read features
         featurelisttableloc = self.ofst + featureofst
         featurecnt = self.fontfile.readuint16(featurelisttableloc)
-        self.features = []
+        self.featurelist = []
         for i in range(featurecnt):
-            self.features.append(Feature(
+            self.featurelist.append(Feature(
                 self.fontfile.read(4).decode(),
                 self.fontfile.readuint16() + featurelisttableloc,
                 self.fontfile))
@@ -459,31 +506,40 @@ class Gsub:
                 self.fontfile.readuint16() + lookuplisttableloc,
                 self.fontfile))
 
+        # Put everything in a dictionary for access
+        self.features = {}
+        for scrname, script in self.scripts.items():
+            langdict = {}
+            for langname, lang in script.languages.items():
+                langfeatures = [self.featurelist[i] for i in lang.featureidxs]
+                featnames = [f.tag for f in langfeatures]
+                featdict = {}
+                for feat in featnames:
+                    lookups = langfeatures[featnames.index(feat)].lookupids
+                    tables = [self.lookups[i] for i in lookups]
+                    featdict[feat] = tables
+                langdict[langname] = featdict
+            self.features[scrname] = langdict            
+
+    def features_active(self):
+        ''' Dictionary of features active in the current script/language system '''
+        return self.features.get(self.language.script, {}).get(self.language.language, {})
+
     def sub(self, glyphids: list[int], features: FontFeatures):
         ''' Apply glyph substitution to list of glyph ids. Features
             enable/disable certain substitutions.
         '''
-        scr = self.scripts.get(self.language.script, self.scripts.get('DFLT'))
-        if scr is None:
-            return glyphids
-        langsys = scr.languages.get(self.language.language, scr.languages.get(''))
-        if langsys is None:
-            return glyphids
-
-        usefeatures = [self.features[i] for i in langsys.featureidxs]  # type: ignore
-        featnames = [f.tag for f in usefeatures]
-
+        feattable = self.features_active()
         def apply_feature(name, glyphids):
-            lookups = usefeatures[featnames.index(name)].lookupids
-            tables = [self.lookups[i] for i in lookups]
+            tables = feattable.get(name, [])
             for table in tables:
-                newglyphids = table.sub(glyphids.copy(), self.lookups)
+                newglyphids = table.sub(glyphids.copy(), self.lookups, name)
                 if newglyphids != glyphids:
                     logging.debug(f'GSUB applied by feature {name} in {table}')
                 glyphids = newglyphids
             return glyphids
 
-        featlist = ['ccmp', 'locl', 'rlig']  # always apply
+        featlist = ['ccmp', 'locl', 'rlig', 'rand']  # always apply
         if features.liga:
             featlist.append('liga')
         if features.dlig:
@@ -492,9 +548,8 @@ class Gsub:
             featlist.append('salt')
         if features.hlig:
             featlist.append('hlig')
-
+            
         for feat in featlist:
-            if feat in featnames:
-                glyphids = apply_feature(feat, glyphids)
+            glyphids = apply_feature(feat, glyphids)
 
         return glyphids
