@@ -31,5 +31,5 @@ class FontFeatures:
     salt: bool = False  # Stylistic alternatives (apply all or nothing)
     dlig: bool = False  # Discretionary ligatures
     hlig: bool = False  # Historical ligatures
-
-
+    c2sc: bool = False  # Small Capitals from Capitals
+    frac: bool = False  # Fractions

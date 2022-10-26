@@ -55,7 +55,7 @@ class Cmap4:
 
         self.glyphmap = {}
         for seg, startcode in enumerate(self.startcodes):
-            for i in range(startcode, self.endcodes[seg]):
+            for i in range(startcode, self.endcodes[seg]+1):
                 if self.idrangeoffset[seg] != 0:
                     idx = seg - len(self.startcodes) + self.idrangeoffset[seg]//2 + i - self.startcodes[seg]
                     gid = self.glyphidarray[idx]

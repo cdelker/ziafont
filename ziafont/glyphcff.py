@@ -101,11 +101,8 @@ def readreal(buf: bytes) -> tuple[float, int]:
 
 def read_glyph_cff(glyphid: int, font: Font) -> SimpleGlyph:
     ''' Read a glyph from the CFF table. '''
-    if font.cffdata is None:
-        font.cffdata = CFF(font)
-
-    charstr = font.cffdata.charstr_index[glyphid]
-    ops, width, bbox = charstr2path(charstr, font.cffdata)
+    charstr = font.cffdata.charstr_index[glyphid]  # type: ignore
+    ops, width, bbox = charstr2path(charstr, font.cffdata)  # type: ignore
     glyph = SimpleGlyph(glyphid, ops, bbox, font)
     return glyph
 
@@ -482,7 +479,7 @@ class CharString:
                 self.stack.append(-(buf[0]-251)*256 - buf[1] - 108)
                 nbytes = 2
             elif buf[0] == 255:
-                self.stack.append(struct.unpack_from('>i', buf[1:])[0])
+                self.stack.append(struct.unpack_from('>l', buf[1:])[0] / 0x10000)
                 nbytes = 5
             else:
                 raise ValueError('Bad encoding byte: ' + str(buf[0]))
@@ -669,7 +666,17 @@ class CFF:
             0x0c0e: ('forcebold', 'number'),
             0x0c11: ('languagegroup', 'number'),
             0x0c12: ('expansionfactor', 'number'),
-            0x0c13: ('initialrandomseed', 'number')}
+            0x0c13: ('initialrandomseed', 'number'),
+            # CIDfont
+            0x0c1e: ('ROS', 'array'),
+            0x0c1f: ('CIDFontVersion', 'number'),
+            0x0c20: ('CIDFontRevision', 'number'),
+            0x0c21: ('CIDFontType', 'number'),
+            0x0c22: ('CIDCount', 'number'),
+            0x0c23: ('UIDBase', 'number'),
+            0x0c24: ('FDArray', 'array'),
+            0x0c25: ('FDSelect', 'number'),
+            0x0c26: ('FontName', 'sid')}
 
         newd = {}
         for key, value in d.items():
@@ -680,4 +687,6 @@ class CFF:
                 newd[newkey] = value
 
         assert newd.get('charstringtype', 2) == 2
+        if 'ROS' in newd:
+            raise NotImplementedError('CID fonts not implemented.')
         return newd

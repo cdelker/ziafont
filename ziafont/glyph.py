@@ -29,6 +29,7 @@ class SimpleGlyph:
         self.path.bbox = bbox  # Only for backward-compatibility
         self.font = font
         basename, _ = os.path.splitext(os.path.basename(self.font.info.filename))
+        basename = ''.join(c for c in basename if c.isalnum())
         self.id = f'{basename}_{index}'
         self.emscale = self.dfltsize / self.font.info.layout.unitsperem
 
@@ -95,12 +96,11 @@ class SimpleGlyph:
             sym.append(path)
         return sym
 
-    def svg(self, fontsize: float = None, svgver: int = 2) -> str:
+    def svg(self, fontsize: float = None) -> str:
         ''' Get SVG as string '''
-        return ET.tostring(self.svgxml(fontsize, svgver=svgver),
-                           encoding='unicode')
+        return ET.tostring(self.svgxml(fontsize), encoding='unicode')
 
-    def svgxml(self, fontsize: float = None, svgver: int = 2) -> ET.Element:
+    def svgxml(self, fontsize: float = None) -> ET.Element:
         ''' Standalong SVG '''
         fontsize = fontsize if fontsize else config.fontsize
         scale = fontsize / self.font.info.layout.unitsperem

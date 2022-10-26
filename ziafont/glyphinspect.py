@@ -189,3 +189,47 @@ class DescribeGlyph:
         </table>
         '''
         return h
+
+
+class ShowGlyphs:
+    ''' Show all glyphs in the font '''
+    def __init__(self, font, size: float = 36, pxwidth: float = 800):
+        self.font = font
+        self.size = size
+        self.pxwidth = pxwidth
+        self.linespacing = 1.15
+
+    def _repr_svg_(self):
+        ''' Jupyter representation '''
+        return self.svg()
+
+    def svg(self) -> str:
+        ''' Glyph SVG string '''
+        return ET.tostring(self.svgxml(), encoding='unicode')
+
+    def svgxml(self) -> ET.Element:
+        lineheight = self.size * self.linespacing
+        scale = self.size / self.font.info.layout.unitsperem
+
+        svg = ET.Element('svg')
+        svg.set('xmlns', 'http://www.w3.org/2000/svg')
+        svg.set('width', fmt(self.pxwidth))
+
+        x = 0
+        y = lineheight
+        for i in range(self.font.info.header.numglyphs):
+            glyph = self.font.glyph_fromid(i)
+            if x + glyph.advance() * scale > self.pxwidth:
+                y += lineheight
+                x = 0
+            if x == 0 and glyph.bbox.xmin < 0:
+                x = glyph.bbox.xmin * scale
+            g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+            if g is not None:
+                svg.append(g)
+            x += glyph.advance() * scale
+
+        height = y + lineheight/2
+        svg.set('viewBox', f'0 0 {fmt(self.pxwidth)} {fmt(height)}')
+        svg.set('height', fmt(height))
+        return svg

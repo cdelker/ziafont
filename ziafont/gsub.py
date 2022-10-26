@@ -204,7 +204,7 @@ class LookupChainedSub3(LookupSubtable):
         ''' Apply glyph substitution to list of glyph ids '''
         ilen = len(self.inptCoverage)
         i = len(self.backCoverage)
-        while i < len(glyphids) - len(self.lookaheadCoverage):
+        while i < len(glyphids) - len(self.lookaheadCoverage) - ilen:
             covidx = [cov.covidx(glyphids[i+k]) for k, cov in enumerate(self.inptCoverage)]
             if None in covidx:
                 i += 1
@@ -418,32 +418,31 @@ class GSUBLookup:
         for i in range(subtablecnt):
             tblofst = self.ofst+self.tableofsts[i]
             fmt = self.fontfile.readuint16(tblofst)
+            if self.type == 7:  # Extension Table - turns into another type
+                self.type = self.fontfile.readuint16()
+                extofst = self.fontfile.readuint32()
+                tblofst += extofst
+                fmt = self.fontfile.readuint16(tblofst)
+
             if self.type == 1:  # Single Substitution
                 if fmt == 1:
-                    self.subtables.append(
-                        LookupSingleSub1(self.ofst+self.tableofsts[i], self.fontfile))
+                    self.subtables.append(LookupSingleSub1(tblofst, self.fontfile))
                 else:
-                    self.subtables.append(
-                        LookupSingleSub2(self.ofst+self.tableofsts[i], self.fontfile))
+                    self.subtables.append(LookupSingleSub2(tblofst, self.fontfile))
 
             elif self.type == 3:  # Alternates lookup
-                self.subtables.append(
-                    LookupAlternate(self.ofst+self.tableofsts[i], self.fontfile))
+                self.subtables.append(LookupAlternate(tblofst, self.fontfile))
                     
             elif self.type == 4:  # Ligature sub
-                self.subtables.append(
-                    LookupLigatureSub(self.ofst+self.tableofsts[i], self.fontfile))
+                self.subtables.append(LookupLigatureSub(tblofst, self.fontfile))
 
             elif self.type == 6:  # Chained context sub
                 if fmt == 1:
-                    self.subtables.append(
-                        LookupChainedSub1(self.ofst+self.tableofsts[i], self.fontfile))
+                    self.subtables.append(LookupChainedSub1(tblofst, self.fontfile))
                 elif fmt == 2:
-                    self.subtables.append(
-                        LookupChainedSub2(self.ofst+self.tableofsts[i], self.fontfile))
+                    self.subtables.append(LookupChainedSub2(tblofst, self.fontfile))
                 else:
-                    self.subtables.append(
-                        LookupChainedSub3(self.ofst+self.tableofsts[i], self.fontfile))
+                    self.subtables.append(LookupChainedSub3(tblofst, self.fontfile))
             else:
                 logging.debug(f'Unimplemented GSUB Lookup Type {self.type}')
                 self.subtables.append(LookupSubtable(self.type, self.fontfile))
@@ -539,15 +538,20 @@ class Gsub:
                 glyphids = newglyphids
             return glyphids
 
-        featlist = ['ccmp', 'locl', 'rlig', 'rand']  # always apply
+        featlist = ['ccmp', 'locl', 'rlig', 'rand', 'init', 'med2', 'medi', 'fina']  # always apply
         if features.liga:
             featlist.append('liga')
         if features.dlig:
             featlist.append('dlig')
+        if features.c2sc:
+            featlist.append('c2sc')
+        if features.frac:
+            featlist.append('frac')
         if features.salt:
             featlist.append('salt')
         if features.hlig:
             featlist.append('hlig')
+        
             
         for feat in featlist:
             glyphids = apply_feature(feat, glyphids)

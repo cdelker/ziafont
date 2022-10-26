@@ -19,6 +19,7 @@ from .cmap import Cmap12, Cmap4
 from .glyph import SimpleGlyph, CompoundGlyph
 from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
+from .glyphinspect import ShowGlyphs
 from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols, FontFeatures
 from .svgpath import fmt
 
@@ -47,7 +48,6 @@ class Font:
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
         self._glyphids: Dict[str, int] = {}
-        self.cffdata: Optional[CFF] = None
 
     def _loadfont(self) -> FontInfo:
         ''' Read font metadata '''
@@ -65,6 +65,10 @@ class Font:
         self.gsub = None
         if 'GSUB' in self.tables:
             self.gsub = gsub.Gsub(self.tables['GSUB'].offset, self.fontfile)
+
+        self.cffdata: Optional[CFF] = None
+        if 'CFF ' in self.tables:
+            self.cffdata = CFF(self)
 
         return info
 
@@ -273,32 +277,35 @@ class Font:
 
     def scripts(self):
         ''' Get list of scripts in the font '''
+        scripts = set()
         if self.gpos:
-            scripts = list(self.gpos.scripts.keys())
-        elif self.gsub:
-            scripts = list(self.gsub.scripts.keys())
-        else:
-            scripts = []
-        return scripts
+            scripts = scripts.union(set(self.gpos.scripts.keys()))
+        if self.gsub:
+            scripts = scripts.union(set(self.gsub.scripts.keys()))
+        return list(scripts)
 
     def languages(self, script='DFLT'):
         ''' Get list of languages in the script '''
-        s = None
-        langs = []
+        langs = set()
         if self.gpos:
             s = self.gpos.scripts.get(script, None)
-        elif self.gsub:
+            if s is not None:
+                langs = langs.union(set(s.languages.keys()))
+            
+        if self.gsub:
             s = self.gsub.scripts.get(script, None)
-        if s is not None:
-            langs = list(s.languages.keys())
-        return langs    
+            if s is not None:
+                langs = langs.union(set(s.languages.keys()))
+        return list(langs)
        
     def language(self, script, language):
         ''' Set script/language to use '''
         if script not in self.scripts():
             raise ValueError(f'Script {script} not defined in font')
+
         if language not in self.languages(script):
             raise ValueError(f'Language {language} not defined in font')
+
         if self.gpos:
             self.gpos.language.script = script
             self.gpos.language.language = language
@@ -379,6 +386,9 @@ class Font:
         txt = Text(s, self, size=size, linespacing=linespacing, halign=halign, valign=valign,
                    color=color, rotation=rotation, rotation_mode=rotation_mode)
         return txt
+
+    def showallglyphs(self, size: float = 36, pxwidth: int = 800):
+        return ShowGlyphs(self)
 
 
 class Text:
@@ -589,8 +599,8 @@ class Text:
                 if elm is not None:
                     word.append(elm)
 
-        ymin = yvals[0] - self.font.info.layout.ascent*scale
-        ymax = yvals[-1] - self.font.info.layout.descent*scale
+        ymin = yvals[0] - self.font.info.layout.ymax*scale
+        ymax = yvals[-1] - self.font.info.layout.ymin*scale
 
         if not config.svg2:
             symbols = []
