@@ -233,3 +233,62 @@ class ShowGlyphs:
         svg.set('viewBox', f'0 0 {fmt(self.pxwidth)} {fmt(height)}')
         svg.set('height', fmt(height))
         return svg
+
+    
+    
+class ShowLookup4:
+    def __init__(self, lookup, font, size: float=36, pxwidth: int=400):
+        self.lookup = lookup
+        self.font = font
+        self.size = size
+        self.pxwidth = pxwidth
+        self.linespacing = 1.25
+    
+    def _repr_svg_(self):
+        ''' Jupyter representation '''
+        return self.svg()
+
+    def svg(self) -> str:
+        ''' Glyph SVG string '''
+        return ET.tostring(self.svgxml(), encoding='unicode')
+
+    def svgxml(self) -> ET.Element:
+        lineheight = self.size * self.linespacing
+        scale = self.size / self.font.info.layout.unitsperem
+
+        svg = ET.Element('svg')
+        svg.set('xmlns', 'http://www.w3.org/2000/svg')
+        svg.set('width', fmt(self.pxwidth))
+
+        y = lineheight
+        
+        for subtable in self.lookup.subtables:
+            assert subtable.covtable.format == 1
+            for covidx, startglyph in enumerate(subtable.covtable.glyphs):
+                ligset = subtable.ligsets[covidx]
+                for nextglyphs, repl in ligset.items():
+                    origglyphs = [startglyph] + list(nextglyphs)
+
+                    x = 0
+                    for gid in origglyphs:
+                        glyph = self.font.glyph_fromid(gid)
+                        g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+                        if g is not None:
+                            svg.append(g)
+                        x += glyph.advance() * scale
+                    x += 20
+                    glyph = self.font.glyph('-')
+                    svg.append(glyph.svgpath(x0=x, y0=y,
+                                             scale=self.size/glyph.dfltsize))
+                    x += glyph.advance() * scale
+                    x += 20
+
+                    glyph = self.font.glyph_fromid(repl)
+                    g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+                    g.set('fill', 'red')
+                    svg.append(g)
+                    y += lineheight
+
+        svg.set('viewBox', f'0 0 {fmt(self.pxwidth)} {fmt(y + lineheight/2)}')
+        svg.set('height', fmt(y + lineheight/2))
+        return svg

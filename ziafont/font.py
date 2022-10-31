@@ -1,7 +1,7 @@
 ''' Read font file and write glyphs to SVG '''
 
 from __future__ import annotations
-from typing import Literal, Union, Optional, Dict
+from typing import Literal, Union, Optional, Sequence, Dict
 import sys
 import os
 import math
@@ -407,7 +407,7 @@ class Text:
                 mimic Matplotlib behavoir. See:
                 https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
     '''
-    def __init__(self, s: str,  font: Union[str, Font] = None,
+    def __init__(self, s: Union[str, Sequence[int]],  font: Union[str, Font] = None,
                  size: float = None, linespacing: float = 1,
                  halign: Literal['left', 'center', 'right'] = 'left',
                  valign: Literal['base', 'center', 'top'] = 'base',
@@ -545,32 +545,56 @@ class Text:
             word.attrib['fill'] = self.color
         return svg, bbox
 
+    def str_to_gids(self):
+        if isinstance(self.str, str):
+            lines = self.str.splitlines()
+            gidlines = [[self.font.glyphindex(c) for c in line] for line in lines]
+        else:
+            gidlines = [self.str]  # Single line
+        return gidlines
+
     def _buildstring(self) -> Symbols:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
         scale = self.size / self.font.info.layout.unitsperem
         lineheight = self.size * self.linespacing
-        lines = self.str.splitlines()
-        yvals = [i*lineheight for i in range(len(lines))]  # valign == 'base'
+        
+        gidlines = self.str_to_gids()
+        yvals = [i*lineheight for i in range(len(gidlines))]  # valign == 'base'
 
         # Generate symbols and calculate x positions using left alignment
         symbols: list[ET.Element] = []  # <symbol> elements
         linewidths: list[float] = []
-        allglyphs = []  # (glyph, x) where x is left aligned
+        xadvance = 0.
+        allglyphs = []  # (glyph, x, y) where x is left aligned, y is delta from baseline
         xmin = 0
-        for lineidx, line in enumerate(lines):
+        for lineidx, glyphids in enumerate(gidlines):
             lineglyphs = []
-            glyphids = [self.font.glyphindex(c) for c in line]
             if self.font.gsub:
                 glyphids = self.font.gsub.sub(glyphids, self.font.features)
-            
+
             glyphs = [self.font.glyph_fromid(gid) for gid in glyphids]
             x = 0
             xmin = min(xmin, glyphs[0].bbox.xmin*scale)
             for gidx, glyph in enumerate(glyphs):
                 if glyph.id not in [s.attrib['id'] for s in symbols]:
                     symbols.append(glyph.svgsymbol())
-                lineglyphs.append((glyph, x))
+                                
+                prevglyph = glyphs[gidx-1] if gidx-1 >= 0 else None
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
+                if self.font.gpos and prevglyph:
+                    # Attach marks
+                    placexy = self.font.gpos.placemark(prevglyph.index, glyph.index)
+                    if placexy:
+                        if not placexy.mkmk:  # Relative to base glyph
+                            dx = dy = 0
+                        dx += (placexy.dx - xadvance) * scale
+                        dy += -placexy.dy * scale
+                    else:
+                        dx = dy = 0
+                else:
+                    dx = dy = 0  # Don't reset, may need these for mark-to-mark p[
+                        
+                lineglyphs.append((glyph, x+dx, dy))                
                 xadvance = glyph.advance(nextglyph)
                 x += xadvance * scale
 
@@ -584,8 +608,6 @@ class Text:
 
         # Place the glyphs based on halign
         word = ET.Element('g')
-        if config.debug:
-            word.attrib['word'] = self.str  # Just an identifier for debugging
         totwidth = max(linewidths)
         for lineidx, (lineglyphs, linewidth) in enumerate(zip(allglyphs, linewidths)):
             if self.halign == 'center':
@@ -594,8 +616,8 @@ class Text:
                 leftshift = totwidth - linewidth
             else:  # halign = 'left'
                 leftshift = 0
-            for glyph, x in lineglyphs:
-                elm = glyph.place(x+leftshift, yvals[lineidx], self.size)
+            for glyph, x, dy in lineglyphs:
+                elm = glyph.place(x+leftshift, yvals[lineidx]+dy, self.size)
                 if elm is not None:
                     word.append(elm)
 

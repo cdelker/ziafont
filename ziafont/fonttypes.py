@@ -28,8 +28,11 @@ Symbols = namedtuple('Symbols', ['word', 'symbols', 'width', 'xmin', 'ymin', 'ym
 class FontFeatures:
     kern: bool = True   # Horizontal kerning
     liga: bool = True   # Ligatures (combine fi, for example)
+    calt: bool = True   # Contextual alternatives
+    clig: bool = True   # Contextual ligatures
     salt: bool = False  # Stylistic alternatives (apply all or nothing)
     dlig: bool = False  # Discretionary ligatures
     hlig: bool = False  # Historical ligatures
     c2sc: bool = False  # Small Capitals from Capitals
     frac: bool = False  # Fractions
+    zero: bool = False  # Zeros with slash
