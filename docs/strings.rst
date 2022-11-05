@@ -73,7 +73,8 @@ Multi-line strings (containing `\\n` characters) can be drawn. Use `halign` to s
 Features
 --------
 
-The :py:meth:`ziafont.Font.features` attribute is used to enable certain typesetting features, such as kerning adjustment and ligature replacement.
+The :py:data:`ziafont.Font.features` attribute is used to enable certain typesetting features, such as kerning adjustment and ligature replacement.
+The feature attribute names correspond to user-configurable `Open Type font features <https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist>`_.
 
 
 Kerning
@@ -164,7 +165,7 @@ To draw the string onto an existing SVG, use the :py:meth:`ziafont.font.Text.dra
     svg.set('width', '100')
     svg.set('height', '50')
     svg.set('xmlns', 'http://www.w3.org/2000/svg')
-    svg.set('viewBox', f'0 0 100 50')
+    svg.set('viewBox', '0 0 100 50')
     circ = ET.SubElement(svg, 'circle')
     circ.set('cx', '50')
     circ.set('cy', '25')
@@ -272,3 +273,12 @@ Lower precision saves space in the SVG string, but may reduce quality of the ima
     :hide-code:
 
     print('...', font.text('A').svg()[228:276])
+
+|
+
+Limitations
+-----------
+
+Ziafont does not currently support right-to-left scripts, or scripts that require advanced `Complex Text Layout <https://en.wikipedia.org/wiki/Complex_text_layout>`_ rules that are not defined in the font file itself.
+
+GSUB Lookup types 5 and 8, and GPOS lookup types 3, 5, 7, and 8 are not currently implemented, along with many script-specific `features <https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist>`_.

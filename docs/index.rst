@@ -38,6 +38,13 @@ No dependencies are required.
 
 |
 
+Demo
+----
+
+See Ziafont in action as it runs in your browser through PyScript `here <https://cdelker.bitbucket.io/pyscript/ziafontstr.html>`_!
+
+|
+
 Support
 -------
 
