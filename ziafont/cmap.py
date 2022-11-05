@@ -1,5 +1,6 @@
 ''' Font CMAP table - translate character into a glyph ID '''
 
+from __future__ import annotations
 from typing import Sequence, Optional
 
 
