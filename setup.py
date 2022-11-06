@@ -5,7 +5,7 @@ with open('README.md', 'r') as f:
 
 setuptools.setup(
     name = 'ziafont',
-    version = '0.4',
+    version = '0.5',
     description = 'Convert TTF/OTF font glyphs to SVG paths',
     author = 'Collin J. Delker',
     author_email = 'ziaplot@collindelker.com',
@@ -28,6 +28,7 @@ setuptools.setup(
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
     'Development Status :: 4 - Beta',
     'License :: OSI Approved :: MIT License',
     'Operating System :: OS Independent',

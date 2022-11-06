@@ -1,9 +1,10 @@
 # Release notes
 
-### 0.5 - IN PROGRESS
+### 0.5 - 2022-11-05
 
 - Added support for CFF font table (usually .otf fonts)
 - Implemented ligature substitution and partial support for GSUB table
+- Implemented mark-to-mark and mark-to-base GPOS positioning
 - Enhanced glyph.test() mode
 - Fix index errors when reading some fonts
 - Only specify font by filename
