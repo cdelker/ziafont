@@ -36,3 +36,4 @@ class FontFeatures:
     c2sc: bool = False  # Small Capitals from Capitals
     frac: bool = False  # Fractions
     zero: bool = False  # Zeros with slash
+    ssty: bool = False  # Math script style alternates

@@ -18,7 +18,7 @@ SequenceLookupRecord = namedtuple('SequenceLookupRecord', ['sequenceindex', 'loo
 
 
 class LookupSubtable:
-    ''' Generic/unimplemented GSBU Lookup Sub Table '''
+    ''' Generic/unimplemented GSUB Lookup Sub Table '''
     def __init__(self, ofst: int, fontfile: FontReader):
         self.ofst = ofst
         self.fontfile = fontfile
@@ -132,9 +132,9 @@ class LookupAlternate(LookupSubtable):
                 if name == 'rand':
                     glyphids[i] = random.choice(self.altglyphs[covidx])
                 else:
-                    # TODO - user choice!
-                    altgids = ', '.join(str(c) for c in self.altglyphs[covidx])
-                    logging.debug(f'Alternate glyphs for id {glyphids[i]}: {altgids}')
+                    altgids = self.altglyphs[covidx]
+                    # TODO - user choice! return first one for now.
+                    glyphids[i] = altgids[0]
 
         return glyphids
 
@@ -600,6 +600,8 @@ class Gsub:
             altfeatures.append('hlig')
         if features.zero:
             altfeatures.append('zero')
+        if features.ssty:
+            altfeatures.append('ssty')
 
         # Run basic features first, in order defined by font
         for feat in feattable.keys():
