@@ -33,8 +33,8 @@ class Point:
     def xform(self, a: float, b: float, c: float, d: float,
               e: float, f: float, m: float, n: float) -> Point:
         ''' Apply Transform (for compound glyph) '''
-        x = m * a/m * self.x + c/m * self.y + e
-        y = n * b/n * self.x + d/n * self.y + f
+        x = m * (a/m * self.x + c/m * self.y + e)
+        y = n * (b/n * self.x + d/n * self.y + f)
         return Point(x, y)
 
 

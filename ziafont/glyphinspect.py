@@ -118,7 +118,7 @@ class InspectGlyph:
 
         # Glyph Outline
         g = self.glyph.svgpath(x0=x0, y0=baseline,
-                               scale=1./self.glyph.emscale)  # type: ignore
+                               scale_factor=1/self.glyph._points_per_unit)  # type: ignore
         if g is not None:
             g.set('fill', 'lightgray')
             g.set('stroke', 'black')
@@ -224,7 +224,7 @@ class ShowGlyphs:
                 x = 0
             if x == 0 and glyph.bbox.xmin < 0:
                 x = glyph.bbox.xmin * scale
-            g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+            g = glyph.svgpath(x0=x, y0=y, scale_factor=self.size/glyph.DFLT_SIZE_PT)
             if g is not None:
                 svg.append(g)
             x += glyph.advance() * scale
@@ -234,9 +234,9 @@ class ShowGlyphs:
         svg.set('height', fmt(height))
         return svg
 
-    
-    
+
 class ShowLookup4:
+    ''' Show items in Lookup Table type 4 '''
     def __init__(self, lookup, font, size: float=36, pxwidth: int=400):
         self.lookup = lookup
         self.font = font
@@ -272,19 +272,19 @@ class ShowLookup4:
                     x = 0
                     for gid in origglyphs:
                         glyph = self.font.glyph_fromid(gid)
-                        g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+                        g = glyph.svgpath(x0=x, y0=y, scale_factor=self.size/glyph.DFLT_SIZE_PT)
                         if g is not None:
                             svg.append(g)
                         x += glyph.advance() * scale
                     x += 20
                     glyph = self.font.glyph('-')
                     svg.append(glyph.svgpath(x0=x, y0=y,
-                                             scale=self.size/glyph.dfltsize))
+                                             scale_factor=self.size/glyph.DFLT_SIZE_PT))
                     x += glyph.advance() * scale
                     x += 20
 
                     glyph = self.font.glyph_fromid(repl)
-                    g = glyph.svgpath(x0=x, y0=y, scale=self.size/glyph.dfltsize)
+                    g = glyph.svgpath(x0=x, y0=y, scale_factor=self.size/glyph.DFLT_SIZE_PT)
                     g.set('fill', 'red')
                     svg.append(g)
                     y += lineheight
