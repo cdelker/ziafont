@@ -50,7 +50,7 @@ class SimpleGlyph:
     def place(self, x: float, y: float, point_size: float) -> Optional[ET.Element]:
         ''' Get <use> svg tag translated/scaled to the right position '''
         scale_factor = (point_size / self.DFLT_SIZE_PT)
-        yshift = self.funits_to_points(self.font.info.layout.ymax, scale_factor)
+        yshift = self.funits_to_points(max(self.bbox.ymax, self.font.info.layout.ymax), scale_factor)
         elm: Optional[ET.Element]
         if config.svg2:
             elm = ET.Element('use')
