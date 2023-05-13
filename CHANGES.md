@@ -1,5 +1,12 @@
 # Release notes
 
+### 0.6 - In progress...
+
+- Enabled SSTY font feature (math script glyph alternatives) 
+- Fixed vertical alignment of glyphs taller than the font maximum (eg Math Assembly Glyphs)
+- Updates for consistency with ziamath
+
+
 ### 0.5 - 2022-11-05
 
 - Added support for CFF font table (usually .otf fonts)
