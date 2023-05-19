@@ -1,6 +1,6 @@
 # Release notes
 
-### 0.6 - In progress...
+### 0.6 - 2023-05-19
 
 - Enabled SSTY font feature (math script glyph alternatives) 
 - Fixed vertical alignment of glyphs taller than the font maximum (eg Math Assembly Glyphs)
