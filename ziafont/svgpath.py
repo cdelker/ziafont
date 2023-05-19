@@ -128,7 +128,8 @@ class Quad:
 
     def path(self, x0: float = 0, y0: float = 0, scale: float = 1) -> str:
         ''' Get SVG path '''
-        return f'Q {fmt(x0 + self.p1.x * scale)} {fmt(y0-self.p1.y * scale)} {fmt(x0+self.p2.x * scale)} {fmt(y0-self.p2.y * scale)} '
+        return (f'Q {fmt(x0 + self.p1.x * scale)} {fmt(y0-self.p1.y * scale)} '
+                f'{fmt(x0+self.p2.x * scale)} {fmt(y0-self.p2.y * scale)} ')
 
     def xform(self, a: float, b: float, c: float, d: float,
               e: float, f: float, m: float, n: float) -> Quad:
@@ -172,7 +173,9 @@ class Cubic:
 
     def path(self, x0: float = 0, y0: float = 0, scale: float = 1) -> str:
         ''' Get SVG path '''
-        return f'C {fmt(x0+self.p1.x * scale)} {fmt(y0-self.p1.y * scale)} {fmt(x0+self.p2.x * scale)} {fmt(y0-self.p2.y * scale)} {fmt(x0+self.p3.x * scale)} {fmt(y0-self.p3.y * scale)} '
+        return (f'C {fmt(x0+self.p1.x * scale)} {fmt(y0-self.p1.y * scale)} '
+                f'{fmt(x0+self.p2.x * scale)} {fmt(y0-self.p2.y * scale)} '
+                f'{fmt(x0+self.p3.x * scale)} {fmt(y0-self.p3.y * scale)} ')
 
     def xform(self, a: float, b: float, c: float, d: float,
               e: float, f: float, m: float, n: float) -> Cubic:

@@ -42,21 +42,23 @@ class SimpleGlyph:
         if self.font.cmap:
             return self.font.cmap.char(self.index)
         return set()
-    
+
     def funits_to_points(self, value: float, scale_factor: float = 1) -> float:
         ''' Convert font units to points '''
         return value * self._points_per_unit * scale_factor
-    
+
     def place(self, x: float, y: float, point_size: float) -> Optional[ET.Element]:
         ''' Get <use> svg tag translated/scaled to the right position '''
-        scale_factor = (point_size / self.DFLT_SIZE_PT)
-        yshift = self.funits_to_points(max(self.bbox.ymax, self.font.info.layout.ymax), scale_factor)
+        scale_factor = point_size / self.DFLT_SIZE_PT
+        yshift = self.funits_to_points(
+            max(self.bbox.ymax, self.font.info.layout.ymax), scale_factor)
         elm: Optional[ET.Element]
         if config.svg2:
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
             dx = min(self.funits_to_points(self.bbox.xmin, scale_factor), 0)
-            elm.attrib['transform'] = f'translate({fmt(x+dx)} {fmt(y-yshift)}) scale({fmt(scale_factor)})'
+            elm.attrib['transform'] = (f'translate({fmt(x+dx)} '
+                                       f'{fmt(y-yshift)}) scale({fmt(scale_factor)})')
         else:
             elm = self.svgpath(x0=x, y0=y, scale_factor=scale_factor)
         return elm
@@ -70,8 +72,8 @@ class SimpleGlyph:
     def svgpath(self, x0: float = 0, y0: float = 0, scale_factor: float = 1) -> Optional[ET.Element]:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
         path = ''
-        for i, op in enumerate(self.operators):
-            segment = op.path(x0, y0, scale=self.funits_to_points(1, scale_factor))
+        for operator in self.operators:
+            segment = operator.path(x0, y0, scale=self.funits_to_points(1, scale_factor))
             if segment[0] == 'M' and path != '':
                 path += 'Z '  # Close intermediate segments
             path += segment
@@ -94,8 +96,7 @@ class SimpleGlyph:
         sym.attrib['width'] = fmt(width)
         sym.attrib['height'] = fmt(height)
         sym.attrib['viewBox'] = f'{fmt(xmin)} {fmt(-ymax)} {fmt(width)} {fmt(height)}'
-        path = self.svgpath()
-        if path is not None:
+        if (path := self.svgpath()) is not None:
             sym.append(path)
         return sym
 
@@ -135,10 +136,11 @@ class SimpleGlyph:
             svg.append(symbol)
             g = ET.SubElement(svg, 'use')
             g.attrib['href'] = f'#{self.id}'
-            g.attrib['transform'] = f'translate({fmt(xmin)}, {fmt(base-ymax)}) scale({fmt(scale_factor)})'
+            g.attrib['transform'] = (f'translate({fmt(xmin)}, '
+                                     f'{fmt(base-ymax)}) scale({fmt(scale_factor)})')
         return svg
 
-    def test(self, pxwidth: float=400, pxheight: float=400) -> InspectGlyph:
+    def test(self, pxwidth: float = 400, pxheight: float = 400) -> InspectGlyph:
         ''' Get Glyph Test representation showing vertices and borders '''
         return InspectGlyph(self, pxwidth, pxheight)
 
@@ -166,11 +168,10 @@ class CompoundGlyph(SimpleGlyph):
             n0 = max(abs(xform.c), abs(xform.d))
             m = 2*m0 if abs(abs(xform.a)-abs(xform.c)) <= 33/65536 else m0
             n = 2*n0 if abs(abs(xform.b)-abs(xform.d)) <= 33/65536 else n0
-            for op in glyph.operators:
-                xoperators.append(op.xform(xform.a, xform.b, xform.c,
-                                           xform.d, xform.e, xform.f, m, n))
+            for operator in glyph.operators:
+                xoperators.append(operator.xform(xform.a, xform.b, xform.c,
+                                                 xform.d, xform.e, xform.f, m, n))
         return xoperators
-
 
 
 class EmptyGlyph(SimpleGlyph):

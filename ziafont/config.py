@@ -1,6 +1,8 @@
 ''' Global configuration options '''
+from dataclasses import dataclass
 
 
+@dataclass
 class Config:
     ''' Global configuration options for Ziafont
 

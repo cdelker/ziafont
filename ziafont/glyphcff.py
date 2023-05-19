@@ -127,19 +127,19 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, BBox
             p = p + Point(0, value[0])
             operators.append(Moveto(p))
         elif op == Operator.HLINETO:
-            for i in range(len(value)):
+            for i, val in enumerate(value):
                 if (i % 2) == 0:  # Alternate Horizontal and Vertical lines
-                    p = p + Point(value[i], 0)
+                    p = p + Point(val, 0)
                 else:
-                    p = p + Point(0, value[i])
+                    p = p + Point(0, val)
                 operators.append(Lineto(p))
 
         elif op == Operator.VLINETO:
-            for i in range(len(value)):
+            for i, val in enumerate(value):
                 if (i % 2) == 0:  # Alternate Horizontal and Vertical lines
-                    p = p + Point(0, value[i])
+                    p = p + Point(0, val)
                 else:
-                    p = p + Point(value[i], 0)
+                    p = p + Point(val, 0)
                 operators.append(Lineto(p))
 
         elif op == Operator.RLINETO:
@@ -309,7 +309,7 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, BBox
             dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, d6, *_ = value
             dx = dx1+dx2+dx3+dx4+dx5
             dy = dy1+dy2+dy3+dy4+dy5
-            
+
             p1 = p + Point(dx1, dy1)
             p2 = p1 + Point(dx2, dy2)
             p3 = p2 + Point(dx3, dy3)
@@ -321,7 +321,7 @@ def charstr2path(charstr: bytes, cff: CFF) -> tuple[list[SVGOpType], float, BBox
                 p = p5 + Point(0, d6)
             operators.append(Cubic(p1, p2, p3))
             operators.append(Cubic(p4, p5, p))
-            
+
         elif op == Operator.HFLEX:
             dx1, dx2, dy2, dx3, dx4, dx5, dx6, *_ = value
             p1 = p + Point(dx1, 0)
@@ -374,9 +374,9 @@ class CharString:
         self.nhints = 0
         self.readcharstr(buf)
 
-    def append(self, op: Operator):
+    def append(self, operator: Operator):
         ''' Append an operator, and clear the stack '''
-        self.operators.append(op)
+        self.operators.append(operator)
         self.operands.append(self.stack)
         self.stack = []
 
@@ -404,8 +404,8 @@ class CharString:
 
                 try:
                     key = Operator(key)
-                except ValueError:
-                    raise NotImplementedError(f'Unimplemented KEY {key}')
+                except ValueError as exc:
+                    raise NotImplementedError(f'Unimplemented KEY {key}') from exc
 
                 if len(self.operators) == 0:
                     # First operator can have extra width parameter.
@@ -444,15 +444,16 @@ class CharString:
                     continue
 
                 elif key in [Operator.HINTMASK, Operator.CNTRMASK]:
-                    if (len(self.operators) > 0 and self.operators[-1] == Operator.HSTEMHM and
-                        self.lenstack > 0):
+                    if (len(self.operators) > 0
+                            and self.operators[-1] == Operator.HSTEMHM
+                            and self.lenstack > 0):
                         # Implied VSTEM operator
                         self.nhints += self.lenstack // 2
                         self.append(Operator.VSTEMHM)
-                    elif (len(self.operators) == 0 or 
-                          (len(self.operators) == 1 and self.operators[0] == Operator.WIDTH)):
+                    elif (len(self.operators) == 0
+                            or (len(self.operators) == 1 and self.operators[0] == Operator.WIDTH)):
                         self.nhints += self.lenstack // 2
-                        self.append(Operator.VSTEMHM) ## ??
+                        self.append(Operator.VSTEMHM)
                     # N-bits for the N hint masks just read in
                     hintbytes = self.nhints + 7 >> 3
                     self.stack = list(buf[1:hintbytes+1])
@@ -483,8 +484,6 @@ class CharString:
                 nbytes = 5
             else:
                 raise ValueError('Bad encoding byte: ' + str(buf[0]))
-                self.stack.append(None)
-                nbytes = 1
 
             buf = buf[nbytes:]
 

@@ -1,0 +1,3 @@
+[FORMAT]
+max-line-length=120
+good-names=i,j,k,p,p1,p2,x,x0,y,y0,dx,dy,lw,ls,bar

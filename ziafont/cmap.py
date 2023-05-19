@@ -20,7 +20,7 @@ class Cmap12:
                 self.glyphmap[i] = self.glyphstarts[startid] + (i-start)
 
         self.glyphmap_r: Optional[dict[int, set[str]]] = None  # Build on demand
-                
+
     def __repr__(self):
         return f'<Cmap Format 12: {self.platform} id={self.platformid}'
 
@@ -58,7 +58,10 @@ class Cmap4:
         for seg, startcode in enumerate(self.startcodes):
             for i in range(startcode, self.endcodes[seg]+1):
                 if self.idrangeoffset[seg] != 0:
-                    idx = seg - len(self.startcodes) + self.idrangeoffset[seg]//2 + i - self.startcodes[seg]
+                    idx = (seg 
+                           - len(self.startcodes)
+                           + self.idrangeoffset[seg]//2
+                           + i - self.startcodes[seg])
                     gid = self.glyphidarray[idx]
                     gid = self.iddeltas[seg] + gid if gid > 0 else 0
                 else:

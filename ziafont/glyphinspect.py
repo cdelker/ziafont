@@ -29,7 +29,7 @@ class InspectGlyph:
     def svgxml(self) -> ET.Element:
         ''' Glyph svg as XML element tree '''
         # Draw glyph at 1:1 scale in glyph units
-        height = (self.font.info.layout.ymax - self.font.info.layout.ymin)
+        height = self.font.info.layout.ymax - self.font.info.layout.ymin
         width = height * self.pxwidth/self.pxheight
 
         # vertical positions
@@ -90,13 +90,15 @@ class InspectGlyph:
 
         # Ticks
         z = ET.SubElement(svg, 'path')
-        z.set('d', f'M {fmt(x0-tick)} {fmt(baseline)} L {fmt(x0)} {fmt(baseline)} {fmt(x0)} {fmt(baseline+tick)}')
+        z.set('d', (f'M {fmt(x0-tick)} {fmt(baseline)} '
+                    f'L {fmt(x0)} {fmt(baseline)} {fmt(x0)} {fmt(baseline+tick)}'))
         z.set('stroke', '#444444')
         z.set('stroke-width', '4px')
         z.set('fill', 'none')
         z.set('vector-effect', 'non-scaling-stroke')
         z = ET.SubElement(svg, 'path')
-        z.set('d', f'M {fmt(x1+tick)} {fmt(baseline)} L {fmt(x1)} {fmt(baseline)} {fmt(x1)} {fmt(baseline+tick)}')
+        z.set('d', (f'M {fmt(x1+tick)} {fmt(baseline)} '
+                    f'L {fmt(x1)} {fmt(baseline)} {fmt(x1)} {fmt(baseline+tick)}'))
         z.set('stroke', '#444444')
         z.set('stroke-width', '4px')
         z.set('fill', 'none')
@@ -243,7 +245,7 @@ class ShowLookup4:
         self.size = size
         self.pxwidth = pxwidth
         self.linespacing = 1.25
-    
+
     def _repr_svg_(self):
         ''' Jupyter representation '''
         return self.svg()
@@ -253,6 +255,7 @@ class ShowLookup4:
         return ET.tostring(self.svgxml(), encoding='unicode')
 
     def svgxml(self) -> ET.Element:
+        ''' Get SVG as XML tree '''
         lineheight = self.size * self.linespacing
         scale = self.size / self.font.info.layout.unitsperem
 
@@ -261,7 +264,6 @@ class ShowLookup4:
         svg.set('width', fmt(self.pxwidth))
 
         y = lineheight
-        
         for subtable in self.lookup.subtables:
             assert subtable.covtable.format == 1
             for covidx, startglyph in enumerate(subtable.covtable.glyphs):

@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 from typing import Literal, Union, Optional, Sequence, Dict
-import sys
-import os
 import math
 from pathlib import Path
 from collections import namedtuple
 import importlib.resources as pkg_resources
 import xml.etree.ElementTree as ET
-import warnings
 
 from .config import config
 from .fontread import FontReader
@@ -20,7 +17,8 @@ from .glyph import SimpleGlyph, CompoundGlyph
 from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
 from .glyphinspect import ShowGlyphs
-from .fonttypes import AdvanceWidth, Layout, Header, Table, FontInfo, FontNames, Symbols, FontFeatures
+from .fonttypes import (AdvanceWidth, Layout, Header, Table,
+                        FontInfo, FontNames, Symbols, FontFeatures)
 from .svgpath import fmt
 
 
@@ -44,6 +42,7 @@ class Font:
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
 
+        self.tables = {}
         self.features = FontFeatures()
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
@@ -291,13 +290,13 @@ class Font:
             s = self.gpos.scripts.get(script, None)
             if s is not None:
                 langs = langs.union(set(s.languages.keys()))
-            
+
         if self.gsub:
             s = self.gsub.scripts.get(script, None)
             if s is not None:
                 langs = langs.union(set(s.languages.keys()))
         return list(langs)
-       
+
     def language(self, script, language):
         ''' Set script/language to use '''
         if script not in self.scripts():
@@ -320,7 +319,7 @@ class Font:
             gid = self.cmap.glyphid(char)  # type: ignore
             self._glyphids[char] = gid
         return gid
-            
+
     def glyph(self, char: str) -> SimpleGlyph:
         ''' Get the Glyph for the character '''
         index = self.glyphindex(char)        # Glyph Number
@@ -361,13 +360,13 @@ class Font:
         return txt.getsize()
 
     def text(self, s: str,
-             size: float=None,
-             linespacing: float=1,
-             halign: Literal['left', 'center', 'right']='left',
-             valign: Literal['base', 'center', 'top']='base',
-             color: str=None,
-             rotation: float=0,
-             rotation_mode: str='anchor'):
+             size: float = None,
+             linespacing: float = 1,
+             halign: Literal['left', 'center', 'right'] = 'left',
+             valign: Literal['base', 'center', 'top'] = 'base',
+             color: str = None,
+             rotation: float = 0,
+             rotation_mode: str = 'anchor'):
         ''' Create a Text object using this font
 
             Args:
@@ -407,8 +406,10 @@ class Text:
                 mimic Matplotlib behavoir. See:
                 https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
     '''
-    def __init__(self, s: Union[str, Sequence[int]],  font: Union[str, Font] = None,
-                 size: float = None, linespacing: float = 1,
+    def __init__(self, s: Union[str, Sequence[int]],
+                 font: Union[str, Font] = None,
+                 size: float = None,
+                 linespacing: float = 1,
                  halign: Literal['left', 'center', 'right'] = 'left',
                  valign: Literal['base', 'center', 'top'] = 'base',
                  color: str = None,
@@ -557,7 +558,7 @@ class Text:
         ''' Create symbols and svg word in a <g> group tag, for placing in an svg '''
         scale = self.size / self.font.info.layout.unitsperem
         lineheight = self.size * self.linespacing
-        
+
         gidlines = self.str_to_gids()
         yvals = [i*lineheight for i in range(len(gidlines))]  # valign == 'base'
 
@@ -578,7 +579,7 @@ class Text:
             for gidx, glyph in enumerate(glyphs):
                 if glyph.id not in [s.attrib['id'] for s in symbols]:
                     symbols.append(glyph.svgsymbol())
-                                
+
                 prevglyph = glyphs[gidx-1] if gidx-1 >= 0 else None
                 nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
                 if self.font.gpos and prevglyph:
@@ -593,7 +594,7 @@ class Text:
                         dx = dy = 0
                 else:
                     dx = dy = 0  # Don't reset, may need these for mark-to-mark p[
-                        
+
                 lineglyphs.append((glyph, x+dx, dy))                
                 xadvance = glyph.advance(nextglyph)
                 x += xadvance * scale

@@ -28,7 +28,7 @@ class Gpos:
         lookupofst = self.fontfile.readuint16()
         if self.verminor > 0:
             self.variationofst = self.fontfile.readuint32()
-            logging.warn('GPOS has feature variations - unimplemented')
+            logging.warning('GPOS has feature variations - unimplemented')
 
         # Read scripts
         scriptlisttableloc = self.ofst + scriptofst
@@ -98,14 +98,15 @@ class Gpos:
                 for lookup in features[feat]:
                     for subtable in lookup.subtables:
                         if not hasattr(subtable, 'anchor'):
-                            logging.debug(f'skipping unimplemented placemark subtable {subtable}')
+                            logging.debug('skipping unimplemented placemark subtable %s', subtable)
                             continue
 
                         anchors = subtable.anchor(base, mark)
                         if anchors is not None:
                             dx = anchors.base.x - anchors.mark.x
                             dy = anchors.base.y - anchors.mark.y
-                            logging.debug(f'Positioning Mark {mark} on {base}: ({dx}, {dy})')
+                            logging.debug('Positioning Mark %s on %s: (%s, %s)',
+                                          mark, base, dx, dy)
                             mkmk = isinstance(subtable, MarkToMarkSubtable)
                             return PlaceMark(dx, dy, mkmk)   # Use first one found
         return None
@@ -139,7 +140,9 @@ class GposLookup:
         if self.flag & USE_MARK_FILTERING_SET:
             self.markfilterset = self.fontfile.readuint16()
 
-        self.subtables: list[Union[PairAdjustmentSubtable, MarkToBaseSubtable, MarkToMarkSubtable]] = []
+        self.subtables: list[Union[PairAdjustmentSubtable,
+                                   MarkToBaseSubtable,
+                                   MarkToMarkSubtable]] = []
         for tblofst in self.tableofsts:
             if self.type == 9:  # Extension table - converts to another type
                 fmt = self.fontfile.readuint16(self.ofst + tblofst)
@@ -157,7 +160,7 @@ class GposLookup:
                 self.subtables.append(MarkToMarkSubtable(
                         tblofst + self.ofst, self.fontfile))
             else:
-                logging.debug(f'Unimplemented GPOS Lookup Type {self.type}')
+                logging.debug('Unimplemented GPOS Lookup Type %s', self.type)
 
         self.fontfile.seek(fileptr)  # Put file pointer back
 
@@ -252,6 +255,7 @@ class PairAdjustmentSubtable:
 
 
 def read_markarray_table(ofst, fontfile):
+    ''' Read MarkArray table from font file '''
     cnt = fontfile.readuint16(ofst)
     MarkRecord = namedtuple('MarkRecord', ['markclass', 'anchortable'])
     markrecords = []
@@ -266,6 +270,7 @@ def read_markarray_table(ofst, fontfile):
 
 
 def read_anchortable(ofst, fontfile):
+    ''' Read anchor table from font file '''
     Anchor = namedtuple('Anchor', ['x', 'y', 'anchorpoint', 'xofst', 'yofst'])
     fmt = fontfile.readuint16(ofst)
     point = None

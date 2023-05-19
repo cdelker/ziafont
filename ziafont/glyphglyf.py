@@ -118,8 +118,8 @@ def read_simpleglyph(font: Font, index: int, numcontours: int, charbox: BBox) ->
     points = []
     controls = []
     start = 0
-    for i in range(len(ends)):
-        stop = ends[i] + 1
+    for end in ends:
+        stop = end + 1
         points.append([Point(x, y) for x, y in zip(xvals[start:stop], yvals[start:stop])])
         controls.append(ctvals[start:stop])
         start = stop
