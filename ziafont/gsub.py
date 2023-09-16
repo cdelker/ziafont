@@ -459,28 +459,30 @@ class GSUBLookup:
         for i in range(subtablecnt):
             tblofst = self.ofst+self.tableofsts[i]
             self.fmt = self.fontfile.readuint16(tblofst)
+            
+            tabletype = self.type
             if self.type == 7:  # Extension Table - turns into another type
-                self.type = self.fontfile.readuint16()
+                tabletype = self.fontfile.readuint16()
                 extofst = self.fontfile.readuint32()
                 tblofst += extofst
                 self.fmt = self.fontfile.readuint16(tblofst)
 
-            if self.type == 1:  # Single Substitution
+            if tabletype == 1:  # Single Substitution
                 if self.fmt == 1:
                     self.subtables.append(LookupSingleSub1(tblofst, self.fontfile))
                 else:
                     self.subtables.append(LookupSingleSub2(tblofst, self.fontfile))
 
-            elif self.type == 2:  # Multiple sub
+            elif tabletype == 2:  # Multiple sub
                 self.subtables.append(LookupMultipleSub(tblofst, self.fontfile))
 
-            elif self.type == 3:  # Alternates lookup
+            elif tabletype == 3:  # Alternates lookup
                 self.subtables.append(LookupAlternate(tblofst, self.fontfile))
 
-            elif self.type == 4:  # Ligature sub
+            elif tabletype == 4:  # Ligature sub
                 self.subtables.append(LookupLigatureSub(tblofst, self.fontfile))
 
-            elif self.type == 6:  # Chained context sub
+            elif tabletype == 6:  # Chained context sub
                 if self.fmt == 1:
                     self.subtables.append(LookupChainedSub1(tblofst, self.fontfile))
                 elif self.fmt == 2:

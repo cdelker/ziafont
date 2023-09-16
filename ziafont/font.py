@@ -299,6 +299,9 @@ class Font:
 
     def language(self, script, language):
         ''' Set script/language to use '''
+        if script == 'DFLT' and 'DFLT' not in self.scripts():
+            script = 'latn'
+
         if script not in self.scripts():
             raise ValueError(f'Script {script} not defined in font')
 

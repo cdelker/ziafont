@@ -144,19 +144,20 @@ class GposLookup:
                                    MarkToBaseSubtable,
                                    MarkToMarkSubtable]] = []
         for tblofst in self.tableofsts:
+            tabletype = self.type
             if self.type == 9:  # Extension table - converts to another type
                 fmt = self.fontfile.readuint16(self.ofst + tblofst)
                 assert fmt == 1
-                self.type = self.fontfile.readuint16()
+                tabletype = self.fontfile.readuint16()
                 tblofst += self.fontfile.readuint32()
 
-            if self.type == 2:  # Pair adjustment positioning
+            if tabletype == 2:  # Pair adjustment positioning
                 self.subtables.append(PairAdjustmentSubtable(
                         tblofst + self.ofst, self.fontfile))
-            elif self.type == 4:  # Mark-to-base
+            elif tabletype == 4:  # Mark-to-base
                 self.subtables.append(MarkToBaseSubtable(
                         tblofst + self.ofst, self.fontfile))
-            elif self.type == 6:  # Mark-to-mark
+            elif tabletype == 6:  # Mark-to-mark
                 self.subtables.append(MarkToMarkSubtable(
                         tblofst + self.ofst, self.fontfile))
             else:
@@ -190,6 +191,7 @@ class PairAdjustmentSubtable:
                 pairsetofsts.append(self.fontfile.readuint16())
 
             PairValue = namedtuple('PairValue', ['secondglyph', 'value1', 'value2'])
+            
             self.pairsets = []
             for i in range(pairsetcount):
                 self.fontfile.seek(pairsetofsts[i] + self.ofst)
