@@ -79,7 +79,7 @@ class Gpos:
         ''' Dictionary of features active in the current script/language system '''
         return self.features.get(self.language.script, {}).get(self.language.language, {})
 
-    def kern(self, glyph1: int, glyph2: int) -> tuple[Optional[dict], Optional[dict]]:
+    def kern(self, glyph1: int, glyph2: int) -> tuple[dict, dict]:
         ''' Get kerning adjustmnet for glyph1 and glyph2 '''
         feattable = self.features_active()
         if 'kern' in feattable:

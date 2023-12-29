@@ -28,7 +28,7 @@ class Font:
         Args:
             name: File name of the font. Defaults to DejaVuSans.
     '''
-    def __init__(self, name: Union[str, Path] = None):
+    def __init__(self, name: Optional[Union[str, Path]] = None):
         self.fname = None
         if name:
             if Path(name).exists():
@@ -42,7 +42,7 @@ class Font:
         with open(self.fname, 'rb') as f:
             self.fontfile = FontReader(f.read())
 
-        self.tables = {}
+        self.tables: dict[str, Table] = {}
         self.features = FontFeatures()
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
@@ -343,7 +343,7 @@ class Font:
             self._glyphs[glyphid] = glyph
         return glyph
 
-    def advance(self, glyph1: int, glyph2: int = None):
+    def advance(self, glyph1: int, glyph2: Optional[int] = None):
         ''' Get advance width in font units, including kerning adjustment
             if glyph2 is defined
         '''
@@ -363,11 +363,11 @@ class Font:
         return txt.getsize()
 
     def text(self, s: str,
-             size: float = None,
+             size: Optional[float] = None,
              linespacing: float = 1,
              halign: Literal['left', 'center', 'right'] = 'left',
              valign: Literal['base', 'center', 'top'] = 'base',
-             color: str = None,
+             color: Optional[str] = None,
              rotation: float = 0,
              rotation_mode: str = 'anchor'):
         ''' Create a Text object using this font
@@ -410,12 +410,12 @@ class Text:
                 https://matplotlib.org/stable/gallery/text_labels_and_annotations/demo_text_rotation_mode.html
     '''
     def __init__(self, s: Union[str, Sequence[int]],
-                 font: Union[str, Font] = None,
-                 size: float = None,
+                 font: Optional[Union[str, Font]] = None,
+                 size: Optional[float] = None,
                  linespacing: float = 1,
                  halign: Literal['left', 'center', 'right'] = 'left',
                  valign: Literal['base', 'center', 'top'] = 'base',
-                 color: str = None,
+                 color: Optional[str] = None,
                  rotation: float = 0,
                  rotation_mode: str = 'anchor'):
         self.str = s

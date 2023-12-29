@@ -3,43 +3,44 @@
 import struct
 from datetime import datetime, timedelta
 from io import BytesIO
+from typing import Optional
 
 
 class FontReader(BytesIO):
     ''' Class for reading from Font File '''
     # TTF/OTF is big-endian (>)
 
-    def readuint32(self, offset: int = None) -> int:
+    def readuint32(self, offset: Optional[int] = None) -> int:
         ''' Read 32-bit unsigned integer '''
         if offset:
             self.seek(offset)
         return struct.unpack('>I', self.read(4))[0]
 
-    def readuint24(self, offset: int = None) -> int:
+    def readuint24(self, offset: Optional[int] = None) -> int:
         ''' Read 24-bit unsigned integer '''
         if offset:
             self.seek(offset)
         return int.from_bytes(self.read(3), 'big')
 
-    def readuint16(self, offset: int = None) -> int:
+    def readuint16(self, offset: Optional[int] = None) -> int:
         ''' Read 16-bit unsigned integer '''
         if offset:
             self.seek(offset)
         return struct.unpack('>H', self.read(2))[0]
 
-    def readuint8(self, offset: int = None) -> int:
+    def readuint8(self, offset: Optional[int] = None) -> int:
         ''' Read 8-bit unsigned integer '''
         if offset:
             self.seek(offset)
         return struct.unpack('>B', self.read(1))[0]
 
-    def readint8(self, offset: int = None) -> int:
+    def readint8(self, offset: Optional[int] = None) -> int:
         ''' Read 8-bit signed integer '''
         if offset:
             self.seek(offset)
         return struct.unpack('>b', self.read(1))[0]
 
-    def readdate(self, offset: int = None) -> datetime:
+    def readdate(self, offset: Optional[int] = None) -> datetime:
         ''' Read datetime '''
         if offset:
             self.seek(offset)
@@ -48,13 +49,13 @@ class FontReader(BytesIO):
         mdate = fontepoch + timedelta(seconds=mtime)
         return mdate
 
-    def readint16(self, offset: int = None) -> int:
+    def readint16(self, offset: Optional[int] = None) -> int:
         ''' Read 16-bit signed integer '''
         if offset:
             self.seek(offset)
         return struct.unpack('>h', self.read(2))[0]
 
-    def readshort(self, offset: int = None) -> float:
+    def readshort(self, offset: Optional[int] = None) -> float:
         ''' Read "short" fixed point number (S1.14) '''
         if offset:
             self.seek(offset)

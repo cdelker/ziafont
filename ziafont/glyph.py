@@ -100,11 +100,11 @@ class SimpleGlyph:
             sym.append(path)
         return sym
 
-    def svg(self, point_size: float = None) -> str:
+    def svg(self, point_size: Optional[float] = None) -> str:
         ''' Get SVG as string '''
         return ET.tostring(self.svgxml(point_size), encoding='unicode')
 
-    def svgxml(self, point_size: float = None) -> ET.Element:
+    def svgxml(self, point_size: Optional[float] = None) -> ET.Element:
         ''' Standalong SVG '''
         point_size = point_size if point_size else config.fontsize
         scale_factor = point_size / self.DFLT_SIZE_PT
