@@ -1,5 +1,11 @@
 # Release notes
 
+### 0.7 - 2023-12-29
+
+- Fixed issue when reading fonts with multiple GPOS or GSUB extension tables
+- Fixed warnings under Python 3.12
+
+
 ### 0.6 - 2023-05-19
 
 - Enabled SSTY font feature (math script glyph alternatives) 
