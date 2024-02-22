@@ -427,7 +427,12 @@ class Text:
         self.size = size if size else config.fontsize
         self.linespacing = linespacing
         if font is None or isinstance(font, str):
-            self.font = Font(font)
+            if font in loadedfonts:
+                self.font = loadedfonts[font]
+            else:
+                # Load the font and cache it for later
+                self.font = Font(font)
+                loadedfonts[font] = self.font
         else:
             self.font = font
         self._symbols = self._buildstring()
@@ -596,7 +601,7 @@ class Text:
                     else:
                         dx = dy = 0
                 else:
-                    dx = dy = 0  # Don't reset, may need these for mark-to-mark p[
+                    dx = dy = 0  # Don't reset, may need these for mark-to-mark
 
                 lineglyphs.append((glyph, x+dx, dy))                
                 xadvance = glyph.advance(nextglyph)
@@ -625,8 +630,8 @@ class Text:
                 if elm is not None:
                     word.append(elm)
 
-        ymin = yvals[0] - self.font.info.layout.ymax*scale
-        ymax = yvals[-1] - self.font.info.layout.ymin*scale
+        ymax = yvals[-1] - min(glyph[0].bbox.ymin for glyph in allglyphs[-1])*scale
+        ymin = yvals[0] - max(glyph[0].bbox.ymax for glyph in allglyphs[0])*scale
 
         if not config.svg2:
             symbols = []
@@ -639,3 +644,6 @@ class Text:
     def getyofst(self) -> float:
         ''' Y-shift from bottom of bbox to 0 '''
         return -self._symbols.ymax
+
+
+loadedfonts: Dict[str, Font] = {}

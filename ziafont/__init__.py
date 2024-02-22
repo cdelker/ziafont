@@ -2,4 +2,4 @@ from .config import config
 from .font import Font, Text
 
 
-__version__ = '0.7'
+__version__ = '0.8a0'
