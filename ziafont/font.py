@@ -432,7 +432,7 @@ class Text:
             else:
                 # Load the font and cache it for later
                 self.font = Font(font)
-                loadedfonts[font] = self.font
+                loadedfonts[str(font)] = self.font
         else:
             self.font = font
         self._symbols = self._buildstring()
