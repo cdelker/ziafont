@@ -1,5 +1,10 @@
 # Release notes
 
+### 0.8 - 2024-04-27
+
+- Tighten bounding box for text size calculations
+  
+
 ### 0.7 - 2023-12-29
 
 - Fixed issue when reading fonts with multiple GPOS or GSUB extension tables

@@ -56,7 +56,7 @@ If you appreciate Ziafont, buy me a coffee to show your support!
 
 |
 
-Source code is available on `Bitbucket <https://bitbucket.org/cdelker/ziafont>`_.
+Source code is available on `Github <https://github.com/cdelker/ziafont>`_.
 
 Ziafont is used by the `Ziamath <https://ziamath.readthedocs.io>`_ and `Ziaplot <https://ziaplot.readthedocs.io>`_ Python packages.
 
