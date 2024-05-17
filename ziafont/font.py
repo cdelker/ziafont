@@ -17,6 +17,7 @@ from .glyph import SimpleGlyph, CompoundGlyph
 from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
 from .glyphinspect import ShowGlyphs
+from .findfont import find_font
 from .fonttypes import (AdvanceWidth, Layout, Header, Table,
                         FontInfo, FontNames, Symbols, FontFeatures)
 from .svgpath import fmt
@@ -28,13 +29,16 @@ class Font:
         Args:
             name: File name of the font. Defaults to DejaVuSans.
     '''
-    def __init__(self, name: Optional[Union[str, Path]] = None):
+    def __init__(self, name: Optional[Union[str, Path]] = None,
+                 searchpaths: Optional[Sequence[str | Path]] = None):
         self.fname = None
         if name:
             if Path(name).exists():
                 self.fname = Path(name)
             else:
-                raise FileNotFoundError(f'Font {name} not found.')
+                self.fname = find_font(name, searchpaths)
+                if self.fname is None:
+                    raise FileNotFoundError(f'Font {name} not found.')
         else:
             with pkg_resources.path('ziafont.fonts', 'DejaVuSans.ttf') as p:
                 self.fname = p
@@ -299,8 +303,9 @@ class Font:
 
     def language(self, script, language):
         ''' Set script/language to use '''
-        if script == 'DFLT' and 'DFLT' not in self.scripts():
-            script = 'latn'
+        scripts = self.scripts()
+        if script == 'DFLT' and 'DFLT' not in scripts:
+            script = 'latn' if 'latn' in scripts else scripts[0]
 
         if script not in self.scripts():
             raise ValueError(f'Script {script} not defined in font')
