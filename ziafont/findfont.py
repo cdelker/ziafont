@@ -1,4 +1,5 @@
 ''' Search system font paths for a font by name '''
+from __future__ import annotations
 from typing import Sequence, Optional
 import os
 import sys
