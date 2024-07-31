@@ -103,10 +103,12 @@ class Gpos:
 
                         anchors = subtable.anchor(base, mark)
                         if anchors is not None:
+                            if anchors.base is None:
+                                return None
                             dx = anchors.base.x - anchors.mark.x
                             dy = anchors.base.y - anchors.mark.y
                             logging.debug('Positioning Mark %s on %s: (%s, %s)',
-                                          mark, base, dx, dy)
+                                        mark, base, dx, dy)
                             mkmk = isinstance(subtable, MarkToMarkSubtable)
                             return PlaceMark(dx, dy, mkmk)   # Use first one found
         return None
@@ -298,7 +300,7 @@ def read_basearray(ofst, fontfile, markclasscount):
             baseanchorofst = fontfile.readuint16()
             ptr = fontfile.tell()
             if baseanchorofst == 0:
-                anchortables.append([])
+                anchortables.append(None)
             else:
                 anchortables.append(read_anchortable(
                     ofst+baseanchorofst, fontfile))

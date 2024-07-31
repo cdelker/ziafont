@@ -37,7 +37,7 @@ class Coverage:
             elif self.format == 2:
                 rangecnt = self.fontfile.readuint16()
                 Range = namedtuple('Range', ['startglyph', 'endglyph', 'covidx'])
-                self.ranges = []
+                self.ranges: list[Range] = []
                 for i in range(rangecnt):
                     self.ranges.append(Range(
                         self.fontfile.readuint16(),
@@ -66,6 +66,16 @@ class Coverage:
             else:
                 idx = None
         return idx
+
+    def list_glyphs(self) -> list[int]:
+        ''' List all glyph indexes covered by the table '''
+        if self.format == 1:
+            return [g for g in self.glyphs]  # make a copy
+
+        glyphs = []
+        for rng in self.ranges:
+            glyphs.extend(list(range(rng.startglyph, rng.endglyph+1)))
+        return glyphs
 
     def __repr__(self):
         return f'<CoverageTable {hex(self.ofst)}>'

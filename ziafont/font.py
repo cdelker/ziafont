@@ -16,7 +16,6 @@ from .cmap import Cmap12, Cmap4
 from .glyph import SimpleGlyph, CompoundGlyph
 from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
-from .glyphinspect import ShowGlyphs
 from .findfont import find_font
 from .fonttypes import (AdvanceWidth, Layout, Header, Table,
                         FontInfo, FontNames, Symbols, FontFeatures)
@@ -393,9 +392,6 @@ class Font:
         txt = Text(s, self, size=size, linespacing=linespacing, halign=halign, valign=valign,
                    color=color, rotation=rotation, rotation_mode=rotation_mode)
         return txt
-
-    def showallglyphs(self, size: float = 36, pxwidth: int = 800):
-        return ShowGlyphs(self)
 
 
 class Text:

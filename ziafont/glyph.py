@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from .fonttypes import GlyphComp, BBox
 from .config import config
 from .svgpath import fmt, SVGOpType
-from .glyphinspect import InspectGlyph, DescribeGlyph
+from .inspect import InspectGlyph, DescribeGlyph
 
 if TYPE_CHECKING:
     from .font import Font

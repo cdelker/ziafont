@@ -500,6 +500,7 @@ class GSUBLookup:
 
     def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: Optional[str] = None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
+        glyphids = [g for g in glyphids]  # Make a copy
         for subtable in self.subtables:
             glyphids = subtable.sub(glyphids, lookups, name)
         return glyphids
