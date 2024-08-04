@@ -7,7 +7,6 @@ import random
 import logging
 
 from .tables import Script, Feature, Coverage, Language, ClassDef
-from .fonttypes import FontFeatures
 
 if TYPE_CHECKING:
     from .fontread import FontReader
@@ -15,6 +14,13 @@ if TYPE_CHECKING:
 
 ChainedSeqRule = namedtuple('ChainedSeqRule', ['backtrack', 'input', 'lookahead', 'sequence'])
 SequenceLookupRecord = namedtuple('SequenceLookupRecord', ['sequenceindex', 'lookupindex'])
+
+
+# Features that cant' be turned off
+PERM_FEATURES = ['ccmp', 'locl', 'rlig', 'rvrn', 'rclt']
+
+# Features that are on by default
+ON_FEATURES = ['calt', 'cpsp', 'clig', 'liga', 'rand']
 
 
 class LookupSubtable:
@@ -568,15 +574,24 @@ class Gsub:
                 langdict[langname] = featdict
             self.features[scrname] = langdict            
 
-    def features_active(self):
-        ''' Dictionary of features active in the current script/language system '''
+        if 'latn' not in self.features:
+            self.language.script = list(self.features.keys())[0]
+
+    def features_available(self) -> dict[str, list[GSUBLookup]]:
+        ''' Dictionary of features available in the current script/language system '''
         return self.features.get(self.language.script, {}).get(self.language.language, {})
 
-    def sub(self, glyphids: list[int], features: FontFeatures):
+    def init_user_features(self) -> dict[str, bool]:
+        ''' Initialize features that can be set by user '''
+        avail = list(self.features_available().keys())
+        avail = [feat for feat in avail if feat not in PERM_FEATURES]
+        return {feat: True if feat in ON_FEATURES else False for feat in avail}
+
+    def sub(self, glyphids: list[int], features: dict[str, bool]):
         ''' Apply glyph substitution to list of glyph ids. Features
             enable/disable certain substitutions.
         '''
-        feattable = self.features_active()
+        feattable = self.features_available()
         
         def apply_feature(name, glyphids):
             tables = feattable.get(name, [])
@@ -587,37 +602,14 @@ class Gsub:
                 glyphids = newglyphids
             return glyphids
 
-        basicfeatures = ['locl', 'ccmp', 'rlig']
-        altfeatures = ['rclt', 'rand']
-        if features.calt:
-            altfeatures.append('calt')
-        if features.clig:
-            altfeatures.append('clig')
-        if features.liga:
-            altfeatures.append('liga')
-        if features.dlig:
-            altfeatures.append('dlig')
-        if features.c2sc:
-            altfeatures.append('c2sc')
-        if features.frac:
-            altfeatures.append('frac')
-        if features.salt:
-            altfeatures.append('salt')
-        if features.hlig:
-            altfeatures.append('hlig')
-        if features.zero:
-            altfeatures.append('zero')
-        if features.ssty:
-            altfeatures.append('ssty')
-
-        # Run basic features first, in order defined by font
+        # Run permanent features first, in order defined by font
         for feat in feattable.keys():
-            if feat in basicfeatures:
+            if feat in PERM_FEATURES:
                 glyphids = apply_feature(feat, glyphids)
 
         # Then alernate/optional features, in order defined by font
         for feat in feattable.keys():
-            if feat in altfeatures:
+            if features.get(feat, False):
                 glyphids = apply_feature(feat, glyphids)
 
         return glyphids

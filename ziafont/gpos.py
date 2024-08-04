@@ -12,6 +12,12 @@ from .tables import Coverage, ClassDef, Feature, Script, Language
 PlaceMark = namedtuple('PlaceMark', ['dx', 'dy', 'mkmk'])
 MarktoBaseAnchor = namedtuple('MarktoBaseAnchor', ['base', 'mark'])
 
+# Features that cant' be turned off
+PERM_FEATURES = ['mark', 'mkmk', 'curs']
+
+# Features that are on by default
+ON_FEATURES = ['kern']
+
 
 class Gpos:
     ''' Glyph Positioning System Table '''
@@ -75,13 +81,22 @@ class Gpos:
                 langdict[langname] = featdict
             self.features[scrname] = langdict
 
-    def features_active(self):
+        if 'latn' not in self.features:
+            self.language.script = list(self.features.keys())[0]
+
+    def features_available(self):
         ''' Dictionary of features active in the current script/language system '''
         return self.features.get(self.language.script, {}).get(self.language.language, {})
 
+    def init_user_features(self) -> dict[str, bool]:
+        ''' Initialize features that can be set by user '''
+        avail = list(self.features_available().keys())
+        avail = [feat for feat in avail if feat not in PERM_FEATURES]
+        return {feat: True if feat in ON_FEATURES else False for feat in avail}
+
     def kern(self, glyph1: int, glyph2: int) -> tuple[dict, dict]:
         ''' Get kerning adjustmnet for glyph1 and glyph2 '''
-        feattable = self.features_active()
+        feattable = self.features_available()
         if 'kern' in feattable:
             for table in feattable['kern']:
                 for subtable in table.subtables:
@@ -92,7 +107,7 @@ class Gpos:
 
     def placemark(self, base: int, mark: int) -> Optional[PlaceMark]:
         ''' Return dx, dy postition wrt original mark position '''
-        features = self.features_active()
+        features = self.features_available()
         for feat in ['mark', 'mkmk']:
             if feat in features:
                 for lookup in features[feat]:

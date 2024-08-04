@@ -67,6 +67,6 @@ Ziafont is used by the `Ziamath <https://ziamath.readthedocs.io>`_ and `Ziaplot 
    :maxdepth: 2
    :caption: Contents:
 
-   strings.rst
-   glyphs.rst
+   usage.rst
+   inspect.rst
    api.rst

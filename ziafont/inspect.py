@@ -29,16 +29,15 @@ lookupnames = {
 def table_header(*cols: Sequence[str]) -> str:
     ''' Make an HTML table header from the columns '''
     parts = [f'<th style="text-align: center;">{c}</th>' for c in cols]
-    cols = ''.join(parts)
-    return f'<table>{cols}'
+    hdr = ''.join(parts)
+    return f'<table>{hdr}'
 
 
 def table_row(*cols: Sequence[str]) -> str:
     ''' Make an HTML table row from the columns '''
-    #parts = [f'<td style="text-align: center;">{c}</td>' for c in cols]
     parts = [f'<td>{c}</td>' for c in cols]
-    cols = ''.join(parts)
-    return f'<tr>{cols}</tr>'
+    row = ''.join(parts)
+    return f'<tr>{row}</tr>'
 
 
 def table_footer() -> str:
@@ -88,12 +87,12 @@ class DescribeFont:
         table += table_row('Number of Glyphs', self.font.info.header.numglyphs)
         table += table_row('Tables', ', '.join(self.font.tables.keys()))
         if self.font.gsub is not None:
-            table += table_row('GSUB features', ', '.join(self.font.gsub.features_active().keys()))
+            table += table_row('GSUB features', ', '.join(self.font.gsub.features_available().keys()))
         else:
             table += table_row('GSUB features', 'None')
         
         if self.font.gpos is not None:
-            table += table_row('GPOS features', ', '.join(self.font.gpos.features_active().keys()))
+            table += table_row('GPOS features', ', '.join(self.font.gpos.features_available().keys()))
         else:
             table += table_row('GPOS features', 'None')
         table += table_row('Scripts/Languages', self.format_languages())
@@ -286,10 +285,11 @@ class DescribeGlyph:
 
 class ShowGlyphs:
     ''' Show all glyphs in the font in HTML table '''
-    def __init__(self, font, size: float = 36, columns: int = 15):
+    def __init__(self, font, size: float = 36, columns: int = 15, nmax: int|None = None):
         self.font = font
         self.size = size
         self.columns = columns
+        self.nmax = nmax
 
     def _repr_html_(self) -> str:
         return self.table()
@@ -298,12 +298,16 @@ class ShowGlyphs:
         ''' Build HTML table '''
         rows = []  # All rows
         row = []  # Current row
-        for i in range(self.font.info.header.numglyphs):
+        nglyphs = self.font.info.header.numglyphs
+        if self.nmax:
+            nglyphs = min(nglyphs, self.nmax)
+        for i in range(nglyphs):
             svg = self.font.glyph_fromid(i).svg(self.size)
             row.append(f'<td><div gid="{i}">{i}<br>{svg}</div></td>')
             if len(row) >= self.columns:
                 rows.append(''.join(row))
                 row = []
+        rows.append(''.join(row))
         rowstrs = [f'<tr>{r}</tr>' for r in rows]
         return '<table>' + ''.join(rowstrs) + '</table>'
 
@@ -314,7 +318,7 @@ class ShowFeature:
         self.featname = featname
         self.font = font
         self.size = size
-        self.lookups = self.font.gsub.features_active()[self.featname]
+        self.lookups = self.font.gsub.features_available()[self.featname]
 
     def _repr_html_(self) -> str:
         html = f'<h2>{self.featname}</h2>'
@@ -365,6 +369,9 @@ class LookupDisplay:
 
     def _repr_html_(self) -> str:
         return self.table()
+
+    def table(self) -> str:
+        return ''
 
 
 class ShowLookup4(LookupDisplay):

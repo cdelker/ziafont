@@ -18,7 +18,7 @@ from .glyphcff import read_glyph_cff, CFF
 from .glyphglyf import read_glyph_glyf
 from .findfont import find_font
 from .fonttypes import (AdvanceWidth, Layout, Header, Table,
-                        FontInfo, FontNames, Symbols, FontFeatures)
+                        FontInfo, FontNames, Symbols)
 from .svgpath import fmt
 
 
@@ -46,7 +46,7 @@ class Font:
             self.fontfile = FontReader(f.read())
 
         self.tables: dict[str, Table] = {}
-        self.features = FontFeatures()
+        self.features: dict[str, bool] = {}
         self.info = self._loadfont()  # Load in all the font metadata
         self._glyphs: Dict[int, Union[SimpleGlyph, CompoundGlyph]] = {}
         self._glyphids: Dict[str, int] = {}
@@ -63,10 +63,12 @@ class Font:
         self.gpos = None
         if 'GPOS' in self.tables:
             self.gpos = gpos.Gpos(self.tables['GPOS'].offset, self.fontfile)
-
+            self.features.update(self.gpos.init_user_features())
+    
         self.gsub = None
         if 'GSUB' in self.tables:
             self.gsub = gsub.Gsub(self.tables['GSUB'].offset, self.fontfile)
+            self.features.update(self.gsub.init_user_features())
 
         self.cffdata: Optional[CFF] = None
         if 'CFF ' in self.tables:
@@ -312,12 +314,15 @@ class Font:
         if language not in self.languages(script):
             raise ValueError(f'Language {language} not defined in font')
 
+        self.features = {}
         if self.gpos:
             self.gpos.language.script = script
             self.gpos.language.language = language
+            self.features.update(self.gpos.init_user_features())
         if self.gsub:
             self.gsub.language.script = script
             self.gsub.language.language = language
+            self.features.update(self.gsub.init_user_features())
 
     def glyphindex(self, char: str) -> int:
         ''' Get index of character glyph '''
@@ -356,7 +361,7 @@ class Font:
         except IndexError:
             adv = self.info.layout.advwidthmax.width
 
-        if self.features.kern and glyph2 and self.gpos:
+        if self.features.get('kern', True) and glyph2 and self.gpos:
             # Only getting x-advance for first glyph.
             adv += self.gpos.kern(glyph1, glyph2)[0].get('xadvance', 0)
         return adv

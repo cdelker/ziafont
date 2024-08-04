@@ -1,5 +1,5 @@
-Drawing Strings
-===============
+Usage
+=====
 
 Start by importing Ziafont and loading a font from a file:
 
@@ -9,16 +9,32 @@ Start by importing Ziafont and loading a font from a file:
     font = ziafont.Font('NotoSerif-Regular.ttf')
 
 
-The font name must be a path to a ttf or otf font file.
+The font name may be a path to a ttf or otf font file.
+It may also be the name of a font installed in the OS system font path.
 If no font name is specified, a built-in font will be used.
 
-Strings can be converted to SVG using :py:class:`ziafont.font.Text` objects. This object provides a Jupyter representation of the string drawn as SVG, but also has methods for getting the SVG as text or as an XML element.
-Running the :py:meth:`ziafont.font.Font.text` method in a Jupyter cell creates a Text object and displays the rendered string.
+Strings can be converted to SVG using :py:class:`ziafont.font.Text` objects.
 
 .. jupyter-execute::
 
     font.text('Example')
 
+This object provides a Jupyter representation of the string drawn as SVG, so when run in a Jupyter cell
+the rendered text is displayed automatically.
+
+The Text object  also has methods for getting the SVG as text or as an XML element.
+Use the `.svg()` method to get a standalone SVG data as a string, which can then be saved to a file:
+
+.. jupyter-execute::
+
+    s = font.text('Example').svg()
+    print(s[:80])  # Just show 80 characters here...
+
+Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3/library/xml.etree.elementtree.html>`_:
+
+.. jupyter-execute::
+
+    font.text('Example').svgxml()
 
 |
 
@@ -73,7 +89,31 @@ Multi-line strings (containing `\\n` characters) can be drawn. Use `halign` to s
 Features
 --------
 
-The :py:data:`ziafont.Font.features` attribute is used to enable certain typesetting features, such as kerning adjustment and ligature replacement.
+The :py:data:`ziafont.Font.features` attribute is used to enable certain typesetting features,
+such as kerning adjustment and ligature replacement.
+
+The `features` attribute provides a lits of available features for the font and
+their enabled status.
+
+.. jupyter-execute::
+
+    font = ziafont.Font()
+    font.features
+
+Here's the default rendering of a word:
+
+.. jupyter-execute::
+
+    font.text('apple')
+
+and with the `salt` (Stylistic Alternatives) feature enabled, this font substitues
+different glyphs for `a` and `l`, among others:
+
+.. jupyter-execute::
+
+    font.features['salt'] = True
+    font.text('apple')
+
 The feature attribute names correspond to user-configurable `Open Type font features <https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist>`_.
 
 
@@ -81,17 +121,17 @@ Kerning
 *******
 
 If the font contains a `"GPOS" <https://docs.microsoft.com/en-us/typography/opentype/spec/gpos>`_ table, with pair-positioning adjustment, kerning adjustment will be applied to control spacing between individual glyphs.
-This can be disabled by setting `font.features.kern=False`. See the difference in this example:
+This can be disabled by turning off the `kern` feature. See the difference in this example:
 
 .. jupyter-execute::
 
     font = ziafont.Font()
-    font.features.kern = False
+    font.features['kern'] = False
     font.text('Type')
 
 .. jupyter-execute::
 
-    font.features.kern = True
+    font.features['kern'] = True
     font.text('Type')
 
 
@@ -100,56 +140,21 @@ Ligatures
 
 In some fonts, multiple glyphs may be drawn with a single ligature glyph, common in combinations such as "ff" or "fl".
 Ligature substitution will be applied by default if the font contains ligature data in a `"GSUB" <https://docs.microsoft.com/en-us/typography/opentype/spec/gsub>`_ table.
-It can be disabled by setting `font.features.liga=False`. 
+It can be disabled by setting the `liga` feature to False.
 
 
 .. jupyter-execute::
 
-    font.features.liga = False
+    font.features['liga'] = False
     font.text('waffle')
 
 .. jupyter-execute::
 
-    font.features.liga = True
+    font.features['liga'] = True
     font.text('waffle')
 
-
-Stylistic Alternatives
-**********************
-
-Some fonts include alternative glyphs for some characters. Enable the alternatives with `font.features.salt=True`.
-
-.. jupyter-execute::
-
-    font.features.salt = True
-    font.text('all')
-
-.. jupyter-execute::
-
-    font.features.salt = False
-    font.text('all')
-
-
 |
 
-Getting SVG data
-----------------
-
-Use the `.svg()` method to get a standalone SVG data as a string, which can then be saved to a file:
-
-.. jupyter-execute::
-
-    s = font.text('Example').svg()
-    print(s[:80])  # Just show 80 characters here...
-
-
-Or `.svgxml()` to get the SVG as an `XML Element Tree <https://docs.python.org/3/library/xml.etree.elementtree.html>`_:
-
-.. jupyter-execute::
-
-    font.text('Example').svgxml()
-
-|
 
 Drawing on an existing SVG
 --------------------------
@@ -205,6 +210,44 @@ The `halign` parameter specifies the typical horizontal alignment of `left`, `ri
     ziafont.config.fontsize = 48
 
 |
+
+Glyphs
+------
+
+At a lower level, Ziafont can also draw individual glyphs. The glyph for a string character can be obtained from :py:meth:`ziafont.font.Font.glyph`.
+Similar to :py:meth:`ziafont.font.Text`, this method returns a Glyph object with methods for returning SVG as a string or as an SVG XML element.
+
+
+.. jupyter-execute::
+
+    font.glyph('D')    
+
+.. jupyter-execute::
+
+    font.glyph('D').svgxml()
+
+
+The above `svg` and `svgxml` methods both return the glyph in a standalone SVG.
+Often, however, the glyph should be added to an existing drawing or used elsewhere.
+The `svgpath` method returns the glyph as an SVG <path> element that can be inserted in an existing SVG.
+Alternatively, the `svgsymbol` method wraps the <path> in an SVG <symbol> element that can be reused multiple times in the same drawing.
+
+Glyph Indexes
+*************
+
+The glyph index refers to its position within the font file, not necessarily the unicode representation of the character.
+The index for a given character in the font can be obtained:
+
+.. jupyter-execute::
+
+    font.glyphindex('&')
+
+
+.. jupyter-execute::
+
+    font.glyph_fromid(9)
+
+
 
 Calculating string size
 -----------------------
