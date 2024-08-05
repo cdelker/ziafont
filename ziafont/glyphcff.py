@@ -405,7 +405,8 @@ class CharString:
                 try:
                     key = Operator(key)
                 except ValueError as exc:
-                    raise NotImplementedError(f'Unimplemented KEY {key}') from exc
+                    break
+                    # raise NotImplementedError(f'Unimplemented KEY {key}') from exc
 
                 if len(self.operators) == 0:
                     # First operator can have extra width parameter.

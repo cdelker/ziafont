@@ -62,7 +62,7 @@ class FontReader(BytesIO):
         x = self.readint16()
         return float(x) * 2**-14
 
-    def readvaluerecord(self, fmt: int) -> dict:
+    def readvaluerecord(self, fmt: int) -> dict[str, int]:
         ''' Read a GPOS "ValueRecord" into a dictionary. Zero values will be omitted. '''
         record = {}
         if fmt & 0x0001:

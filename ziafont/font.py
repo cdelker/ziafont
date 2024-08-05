@@ -5,6 +5,7 @@ from typing import Literal, Union, Optional, Sequence, Dict
 import math
 from pathlib import Path
 from collections import namedtuple
+from itertools import accumulate
 import importlib.resources as pkg_resources
 import xml.etree.ElementTree as ET
 
@@ -352,18 +353,12 @@ class Font:
             self._glyphs[glyphid] = glyph
         return glyph
 
-    def advance(self, glyph1: int, glyph2: Optional[int] = None):
-        ''' Get advance width in font units, including kerning adjustment
-            if glyph2 is defined
-        '''
+    def advance(self, glyph: int) -> int:
+        ''' Get advance width in font units '''
         try:
-            adv = self.advwidths[glyph1].width
+            adv = self.advwidths[glyph].width
         except IndexError:
             adv = self.info.layout.advwidthmax.width
-
-        if self.features.get('kern', True) and glyph2 and self.gpos:
-            # Only getting x-advance for first glyph.
-            adv += self.gpos.kern(glyph1, glyph2)[0].get('xadvance', 0)
         return adv
 
     def getsize(self, s) -> tuple[float, float]:
@@ -576,50 +571,45 @@ class Text:
         gidlines = self.str_to_gids()
         yvals = [i*lineheight for i in range(len(gidlines))]  # valign == 'base'
 
-        # Generate symbols and calculate x positions using left alignment
         symbols: list[ET.Element] = []  # <symbol> elements
         linewidths: list[float] = []
-        xadvance = 0.
-        allglyphs = []  # (glyph, x, y) where x is left aligned, y is delta from baseline
+        allglyphs: list[list[tuple[SimpleGlyph, int, int]]] = []  # (glyph, x, y) where x is left aligned, y is delta from baseline
         xmin = 0
+        ymin = math.inf
+        ymax = -math.inf
         for lineidx, glyphids in enumerate(gidlines):
-            lineglyphs = []
+            lineglyphs: list[tuple[SimpleGlyph, int, int]] = []
+
+            # Apply glyph substitutions (GSUB)
             if self.font.gsub:
                 glyphids = self.font.gsub.sub(glyphids, self.font.features)
 
             glyphs = [self.font.glyph_fromid(gid) for gid in glyphids]
-            x = 0
+
+            # Apply Glyph Positioning (GPOS)
+            if self.font.gpos:
+                xy = self.font.gpos.position(glyphs, self.font.features)
+            else:
+                xs: list[int] = list(accumulate([glyph.advance() for glyph in glyphs], initial=0))
+                xy = [(x, 0) for x in xs[:-1]]
+
+            lineglyphs = [(glyph, x*scale, -y*scale) for glyph, (x, y) in zip(glyphs, xy)]
+
+            # Accumulate multi-line widths/heights
             xmin = min(xmin, glyphs[0].bbox.xmin*scale)
-            for gidx, glyph in enumerate(glyphs):
-                if glyph.id not in [s.attrib['id'] for s in symbols]:
-                    symbols.append(glyph.svgsymbol())
-
-                prevglyph = glyphs[gidx-1] if gidx-1 >= 0 else None
-                nextglyph = glyphs[gidx+1] if gidx+1 < len(glyphs) else None
-                if self.font.gpos and prevglyph:
-                    # Attach marks
-                    placexy = self.font.gpos.placemark(prevglyph.index, glyph.index)
-                    if placexy:
-                        if not placexy.mkmk:  # Relative to base glyph
-                            dx = dy = 0
-                        dx += (placexy.dx - xadvance) * scale
-                        dy += -placexy.dy * scale
-                    else:
-                        dx = dy = 0
-                else:
-                    dx = dy = 0  # Don't reset, may need these for mark-to-mark
-
-                lineglyphs.append((glyph, x+dx, dy))                
-                xadvance = glyph.advance(nextglyph)
-                x += xadvance * scale
-
-            if glyph.bbox.xmax > xadvance:
+            last_advance = glyphs[-1].advance()
+            linewidth = (xy[-1][0] + last_advance) * scale
+            if glyphs[-1].bbox.xmax > last_advance:
                 # Make linewidth a bit wider to grab right edge
                 # that extends beyond advance width
-                x += (glyph.bbox.xmax - xadvance) * scale
-                x += (-glyphs[0].bbox.xmin) * scale
-            linewidths.append(x)
+                linewidth += (glyphs[-1].bbox.xmax - last_advance) * scale
+                linewidth += (-glyphs[0].bbox.xmin) * scale
+            linewidths.append(linewidth)
             allglyphs.append(lineglyphs)
+
+            # Accumulate SVG symbols for each glyph
+            symbols.extend([glyph.svgsymbol()
+                            for glyph in glyphs if glyph.id not in [s.attrib['id'] for s in symbols]])
 
         # Place the glyphs based on halign
         word = ET.Element('g')
@@ -636,8 +626,8 @@ class Text:
                 if elm is not None:
                     word.append(elm)
 
-        ymax = yvals[-1] - min(glyph[0].bbox.ymin for glyph in allglyphs[-1])*scale
-        ymin = yvals[0] - max(glyph[0].bbox.ymax for glyph in allglyphs[0])*scale
+        ymax = yvals[-1] - min(glyph[0].bbox.ymin*scale - glyph[2] for glyph in allglyphs[-1])
+        ymin = yvals[0] - max(glyph[0].bbox.ymax*scale - glyph[2] for glyph in allglyphs[0])
 
         if not config.svg2:
             symbols = []

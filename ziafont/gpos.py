@@ -7,10 +7,10 @@ from collections import namedtuple
 
 from .fontread import FontReader
 from .tables import Coverage, ClassDef, Feature, Script, Language
+from .glyph import SimpleGlyph
 
 
-PlaceMark = namedtuple('PlaceMark', ['dx', 'dy', 'mkmk'])
-MarktoBaseAnchor = namedtuple('MarktoBaseAnchor', ['base', 'mark'])
+PositionDelta = namedtuple('PositionDelta', ['dx', 'dy', 'dadvance'])
 
 # Features that cant' be turned off
 PERM_FEATURES = ['mark', 'mkmk', 'curs']
@@ -94,39 +94,27 @@ class Gpos:
         avail = [feat for feat in avail if feat not in PERM_FEATURES]
         return {feat: True if feat in ON_FEATURES else False for feat in avail}
 
-    def kern(self, glyph1: int, glyph2: int) -> tuple[dict, dict]:
-        ''' Get kerning adjustmnet for glyph1 and glyph2 '''
+    def position(self, glyphs: list[SimpleGlyph], features: dict[str, bool]) -> list[tuple[int, int]]:
+        ''' Calculate x, y position of each glyph using the given features '''
+        gids = [glyph.index for glyph in glyphs]
+        delta: list[PositionDelta] = [PositionDelta(0,0,0) for _ in gids]
+        advances = [glyph.advance() for glyph in glyphs]
+
         feattable = self.features_available()
-        if 'kern' in feattable:
-            for table in feattable['kern']:
-                for subtable in table.subtables:
-                    v1, v2 = subtable.get_adjust(glyph1, glyph2)
-                    if v1 or v2:
-                        return v1, v2
-        return {}, {}  # No adjustments
+        for feat in feattable.keys():
+            if feat in PERM_FEATURES or features.get(feat, False):        
+                tables = feattable.get(feat, [])
+                for table in tables:
+                    ddelta = table.adjust(*gids, advances=advances)
+                    delta = merge_deltas(delta, ddelta)
 
-    def placemark(self, base: int, mark: int) -> Optional[PlaceMark]:
-        ''' Return dx, dy postition wrt original mark position '''
-        features = self.features_available()
-        for feat in ['mark', 'mkmk']:
-            if feat in features:
-                for lookup in features[feat]:
-                    for subtable in lookup.subtables:
-                        if not hasattr(subtable, 'anchor'):
-                            logging.debug('skipping unimplemented placemark subtable %s', subtable)
-                            continue
-
-                        anchors = subtable.anchor(base, mark)
-                        if anchors is not None:
-                            if anchors.base is None:
-                                return None
-                            dx = anchors.base.x - anchors.mark.x
-                            dy = anchors.base.y - anchors.mark.y
-                            logging.debug('Positioning Mark %s on %s: (%s, %s)',
-                                        mark, base, dx, dy)
-                            mkmk = isinstance(subtable, MarkToMarkSubtable)
-                            return PlaceMark(dx, dy, mkmk)   # Use first one found
-        return None
+        xy: list[tuple[int, int]] = []
+        x = 0
+        for d, glyph in zip(delta, glyphs):
+            x += d.dx
+            xy.append((x, d.dy))
+            x += glyph.advance() + d.dadvance
+        return xy
 
     def __repr__(self):
         return f'<GPOS Table v{self.vermajor}.{self.verminor}>'
@@ -157,18 +145,21 @@ class GposLookup:
         if self.flag & USE_MARK_FILTERING_SET:
             self.markfilterset = self.fontfile.readuint16()
 
-        self.subtables: list[Union[PairAdjustmentSubtable,
-                                   MarkToBaseSubtable,
-                                   MarkToMarkSubtable]] = []
+        self.subtables: list[GposSubtable] = []
         for tblofst in self.tableofsts:
             tabletype = self.type
+            fmt = self.fontfile.readuint16(self.ofst + tblofst)
             if self.type == 9:  # Extension table - converts to another type
-                fmt = self.fontfile.readuint16(self.ofst + tblofst)
                 assert fmt == 1
                 tabletype = self.fontfile.readuint16()
                 tblofst += self.fontfile.readuint32()
+                fmt = self.fontfile.readuint16(tblofst)
 
-            if tabletype == 2:  # Pair adjustment positioning
+            if tabletype == 1 and fmt == 1:
+                self.subtables.append(SingleAdjustmentSubtable(
+                    tblofst + self.ofst, self.fontfile))
+
+            elif tabletype == 2:  # Pair adjustment positioning
                 self.subtables.append(PairAdjustmentSubtable(
                         tblofst + self.ofst, self.fontfile))
             elif tabletype == 4:  # Mark-to-base
@@ -182,11 +173,80 @@ class GposLookup:
 
         self.fontfile.seek(fileptr)  # Put file pointer back
 
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        deltas: list[PositionDelta] = [PositionDelta(0,0,0) for _ in glyphids]
+        for subtable in self.subtables:
+            d = subtable.adjust(*glyphids, advances=advances)
+            deltas = merge_deltas(deltas, d)
+        return deltas
+
     def __repr__(self):
         return f'<GPOSLookup Type {self.type} {hex(self.ofst)}>'
 
 
-class PairAdjustmentSubtable:
+def merge_delta(d1: PositionDelta, d2: PositionDelta) -> PositionDelta:
+    return PositionDelta(d1.dx+d2.dx,
+                         d1.dy+d2.dy,
+                         d1.dadvance+d2.dadvance)
+
+
+def merge_deltas(deltas1: list[PositionDelta], deltas2: list[PositionDelta]) -> list[PositionDelta]:
+    return [merge_delta(d1, d2)
+            for d1, d2 in zip(deltas1, deltas2)]
+
+
+def valuerec_to_delta(vrec: dict[str, int]|None) -> PositionDelta:
+    if vrec is None:
+        return PositionDelta(0, 0, 0)
+    return PositionDelta(
+        vrec.get('x', 0),
+        vrec.get('y', 0),
+        vrec.get('xadvance', 0))
+
+
+class GposSubtable:
+    ''' Base class for GPOS subtables (mostly for type hints) '''
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        return []
+
+
+class SingleAdjustmentSubtable(GposSubtable):
+    ''' Single adjustment subtable (GPOS Lookup 1.1) '''
+    def __init__(self, ofst: int, fontfile: FontReader):
+        self.ofst = ofst
+        self.fontfile = fontfile
+        fileptr = self.fontfile.tell()
+
+        self.fontfile.seek(self.ofst)
+        fmt = self.fontfile.readuint16()
+        assert fmt == 1
+        self.covofst = self.fontfile.readuint16()
+        valueformat = self.fontfile.readuint16()
+        self.valuerecord = self.fontfile.readvaluerecord(valueformat)
+        self.coverage = Coverage(self.covofst+self.ofst, self.fontfile)
+        self.fontfile.seek(fileptr)  # Put file pointer back
+
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        adjusts: list[PositionDelta] = []
+
+        for gid in glyphids:
+            if self.coverage.covidx(gid):
+                pos = PositionDelta(
+                    self.valuerecord.get('x', 0),
+                    self.valuerecord.get('y', 0),
+                    self.valuerecord.get('xadvance', 0))
+                logging.debug('Positioning glyph %s: (%s, %s)',
+                              gid, pos.dx, pos.dy, pos.dadvance)
+
+            else:
+                pos = PositionDelta(0, 0, 0)
+            adjusts.append(pos)
+        return adjusts
+
+
+class PairAdjustmentSubtable(GposSubtable):
     ''' Pair Adjustment Table (GPOS Lookup Type 2)
         Informs kerning between pairs of glyphs
     '''
@@ -269,6 +329,32 @@ class PairAdjustmentSubtable:
 
         return v1, v2
 
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
+        valuerec1 = valuerec2 = None
+        for gid, gid0 in zip(glyphids[1:], glyphids[:-1]):
+            covidx = self.coverage.covidx(gid0)
+            if covidx is None:
+                deltas.append(PositionDelta(0, 0, 0))
+            else:
+                if self.posformat == 1:
+                    for p in self.pairsets[covidx]:
+                        if p.secondglyph == gid:
+                            valuerec1 = p.value1
+                            valuerec2 = p.value2
+                            break
+                else:
+                    c1 = self.class1def.get_class(gid0)
+                    c2 = self.class2def.get_class(gid)
+                    if c1 is not None and c2 is not None:
+                        valuerec1, valuerec2 = self.classrecords[c1][c2]
+
+                deltas[-1] = merge_delta(deltas[-1], valuerec_to_delta(valuerec1))
+                deltas.append(valuerec_to_delta(valuerec2))
+
+        return deltas
+
     def __repr__(self):
         return f'<PairAdjustmentSubtable {hex(self.ofst)}>'
 
@@ -324,7 +410,7 @@ def read_basearray(ofst, fontfile, markclasscount):
     return basearray
 
 
-class MarkToBaseSubtable:
+class MarkToBaseSubtable(GposSubtable):
     ''' Mark-To-Base Positioning Table (GPOS Lookup Type 4) '''
     def __init__(self, ofst: int, fontfile: FontReader):
         self.ofst = ofst
@@ -343,22 +429,30 @@ class MarkToBaseSubtable:
         self.markcoverage = Coverage(self.ofst+markcovofst, self.fontfile)
         self.basecoverage = Coverage(self.ofst+basecovofst, self.fontfile)
 
-    def anchor(self, base: int, mark: int) -> Optional[MarktoBaseAnchor]:
-        ''' Get anchors for mark glyph with respect to base glyph '''
-        markid = self.markcoverage.covidx(mark)
-        if markid is None:
-            return None
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
+        for i, (gid, gid0) in enumerate(zip(glyphids[1:], glyphids[:-1])):
+            markid = self.markcoverage.covidx(gid)
+            baseid = self.basecoverage.covidx(gid0)
+            if markid is None or baseid is None:
+                deltas.append(PositionDelta(0, 0, 0))
+            else:
+                markanchor = self.markarray[markid]
+                baseanchor = self.basearray[baseid][markanchor.markclass]
+                if baseanchor is None:
+                    deltas.append(PositionDelta(0, 0, 0))
+                else:
+                    dx = baseanchor.x - markanchor.anchortable.x - advances[i]
+                    dy = baseanchor.y - markanchor.anchortable.y
+                    deltas.append(PositionDelta(dx, dy, -dx))
+                    logging.debug('Positioning Mark %s on Base %s: (%s, %s)',
+                                  gid, gid0, dx, dy)
 
-        baseid = self.basecoverage.covidx(base)
-        if baseid is None:
-            return None
-
-        markanchor = self.markarray[markid]
-        baseanchor = self.basearray[baseid][markanchor.markclass]
-        return MarktoBaseAnchor(baseanchor, markanchor.anchortable)
+        return deltas
 
 
-class MarkToMarkSubtable:
+class MarkToMarkSubtable(GposSubtable):
     ''' Mark-To-Mark Positioning Table (GPOS Lookup Type 6) '''
     def __init__(self, ofst: int, fontfile: FontReader):
         self.ofst = ofst
@@ -394,16 +488,24 @@ class MarkToMarkSubtable:
         self.mark2coverage = Coverage(
             self.ofst+mark2covofst, self.fontfile)
 
-    def anchor(self, mark2: int, mark1: int) -> Optional[MarktoBaseAnchor]:
-        ''' Get anchors for mark glyph with respect to first mark glyph '''
-        mark1id = self.mark1coverage.covidx(mark1)
-        if mark1id is None:
-            return None
+    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
+        for i, (gid, gid0) in enumerate(zip(glyphids[1:], glyphids[:-1])):
+            mark1id = self.mark1coverage.covidx(gid)
+            mark2id = self.mark2coverage.covidx(gid0)
+            if mark1id is None or mark2id is None:
+                deltas.append(PositionDelta(0, 0, 0))
+            else:
+                mark1anchor = self.mark1array[mark1id]
+                mark2anchor = self.mark2array[mark2id][mark1anchor.markclass]
+                if mark2anchor is None:
+                    deltas.append(PositionDelta(0, 0, 0))
+                else:
+                    dx = mark2anchor.x - mark1anchor.anchortable.x - advances[i]
+                    dy = mark2anchor.y - mark1anchor.anchortable.y
+                    deltas.append(PositionDelta(dx, dy, -dx))
+                    logging.debug('Positioning Mark %s on Mark %s: (%s, %s)',
+                                  gid, gid0, dx, dy)
 
-        mark2id = self.mark2coverage.covidx(mark2)
-        if mark2id is None:
-            return None
-
-        mark1anchor = self.mark1array[mark1id]
-        mark2anchor = self.mark2array[mark2id][mark1anchor.markclass]
-        return MarktoBaseAnchor(mark2anchor, mark1anchor.anchortable)
+        return deltas
