@@ -105,7 +105,7 @@ class Gpos:
             if feat in PERM_FEATURES or features.get(feat, False):        
                 tables = feattable.get(feat, [])
                 for table in tables:
-                    ddelta = table.adjust(*gids, advances=advances)
+                    ddelta = table.adjust(*gids, advances=advances, lookups=self.lookups)
                     delta = merge_deltas(delta, ddelta)
 
         xy: list[tuple[int, int]] = []
@@ -158,6 +158,9 @@ class GposLookup:
             if tabletype == 1 and fmt == 1:
                 self.subtables.append(SingleAdjustmentSubtable(
                     tblofst + self.ofst, self.fontfile))
+            elif tabletype == 1 and fmt == 2:
+                self.subtables.append(SingleAdjustmentSubtable2(
+                    tblofst + self.ofst, self.fontfile))
 
             elif tabletype == 2:  # Pair adjustment positioning
                 self.subtables.append(PairAdjustmentSubtable(
@@ -173,11 +176,11 @@ class GposLookup:
 
         self.fontfile.seek(fileptr)  # Put file pointer back
 
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         ''' Get dx, dy, dxadvance for the glyph '''
         deltas: list[PositionDelta] = [PositionDelta(0,0,0) for _ in glyphids]
         for subtable in self.subtables:
-            d = subtable.adjust(*glyphids, advances=advances)
+            d = subtable.adjust(*glyphids, advances=advances, lookups=lookups)
             deltas = merge_deltas(deltas, d)
         return deltas
 
@@ -207,7 +210,7 @@ def valuerec_to_delta(vrec: dict[str, int]|None) -> PositionDelta:
 
 class GposSubtable:
     ''' Base class for GPOS subtables (mostly for type hints) '''
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         return []
 
 
@@ -227,17 +230,55 @@ class SingleAdjustmentSubtable(GposSubtable):
         self.coverage = Coverage(self.covofst+self.ofst, self.fontfile)
         self.fontfile.seek(fileptr)  # Put file pointer back
 
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         ''' Get dx, dy, dxadvance for the glyph '''
         adjusts: list[PositionDelta] = []
 
         for gid in glyphids:
-            if self.coverage.covidx(gid):
+            if self.coverage.covidx(gid) is not None:
                 pos = PositionDelta(
                     self.valuerecord.get('x', 0),
                     self.valuerecord.get('y', 0),
                     self.valuerecord.get('xadvance', 0))
-                logging.debug('Positioning glyph %s: (%s, %s)',
+                logging.debug('Positioning glyph %s: (%s, %s, %s)',
+                              gid, pos.dx, pos.dy, pos.dadvance)
+
+            else:
+                pos = PositionDelta(0, 0, 0)
+            adjusts.append(pos)
+        return adjusts
+
+
+class SingleAdjustmentSubtable2(GposSubtable):
+    ''' Single adjustment subtable (GPOS Lookup 1.2) '''
+    def __init__(self, ofst: int, fontfile: FontReader):
+        self.ofst = ofst
+        self.fontfile = fontfile
+        fileptr = self.fontfile.tell()
+
+        self.fontfile.seek(self.ofst)
+        fmt = self.fontfile.readuint16()
+        assert fmt == 2
+        self.covofst = self.fontfile.readuint16()
+        valueformat = self.fontfile.readuint16()
+        valuecount = self.fontfile.readuint16()
+        self.valuerecords = []
+        for i in range(valuecount):
+            self.valuerecords.append(self.fontfile.readvaluerecord(valueformat))
+        self.coverage = Coverage(self.covofst+self.ofst, self.fontfile)
+        self.fontfile.seek(fileptr)  # Put file pointer back
+
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
+        ''' Get dx, dy, dxadvance for the glyph '''
+        adjusts: list[PositionDelta] = []
+
+        for gid in glyphids:
+            if (covidx := self.coverage.covidx(gid) is not None):
+                pos = PositionDelta(
+                    self.valuerecords[covidx].get('x', 0),
+                    self.valuerecords[covidx].get('y', 0),
+                    self.valuerecords[covidx].get('xadvance', 0))
+                logging.debug('Positioning glyph %s: (%s, %s, %s)',
                               gid, pos.dx, pos.dy, pos.dadvance)
 
             else:
@@ -329,7 +370,7 @@ class PairAdjustmentSubtable(GposSubtable):
 
         return v1, v2
 
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         ''' Get dx, dy, dxadvance for the glyph '''
         deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
         valuerec1 = valuerec2 = None
@@ -429,7 +470,7 @@ class MarkToBaseSubtable(GposSubtable):
         self.markcoverage = Coverage(self.ofst+markcovofst, self.fontfile)
         self.basecoverage = Coverage(self.ofst+basecovofst, self.fontfile)
 
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         ''' Get dx, dy, dxadvance for the glyph '''
         deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
         for i, (gid, gid0) in enumerate(zip(glyphids[1:], glyphids[:-1])):
@@ -488,7 +529,7 @@ class MarkToMarkSubtable(GposSubtable):
         self.mark2coverage = Coverage(
             self.ofst+mark2covofst, self.fontfile)
 
-    def adjust(self, *glyphids: int, advances: list[int]) -> list[PositionDelta]:
+    def adjust(self, *glyphids: int, advances: list[int], lookups: list[GposLookup]) -> list[PositionDelta]:
         ''' Get dx, dy, dxadvance for the glyph '''
         deltas: list[PositionDelta] = [PositionDelta(0,0,0)]
         for i, (gid, gid0) in enumerate(zip(glyphids[1:], glyphids[:-1])):
