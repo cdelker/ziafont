@@ -37,34 +37,37 @@ class Gpos:
             logging.warning('GPOS has feature variations - unimplemented')
 
         # Read scripts
-        scriptlisttableloc = self.ofst + scriptofst
-        scriptcnt = self.fontfile.readuint16(scriptlisttableloc)
         self.scripts = {}
-        for i in range(scriptcnt):
-            tag = self.fontfile.read(4).decode()
-            self.scripts[tag] = Script(
-                tag,
-                self.fontfile.readuint16() + scriptlisttableloc,
-                self.fontfile)
+        if scriptofst != 0:
+            scriptlisttableloc = self.ofst + scriptofst
+            scriptcnt = self.fontfile.readuint16(scriptlisttableloc)
+            for i in range(scriptcnt):
+                tag = self.fontfile.read(4).decode()
+                self.scripts[tag] = Script(
+                    tag,
+                    self.fontfile.readuint16() + scriptlisttableloc,
+                    self.fontfile)
 
         # Read features
-        featurelisttableloc = self.ofst + featureofst
-        featurecnt = self.fontfile.readuint16(featurelisttableloc)
         featurelist = []
-        for i in range(featurecnt):
-            featurelist.append(Feature(
-                self.fontfile.read(4).decode(),
-                self.fontfile.readuint16() + featurelisttableloc,
-                self.fontfile))
+        if featureofst != 0:
+            featurelisttableloc = self.ofst + featureofst
+            featurecnt = self.fontfile.readuint16(featurelisttableloc)
+            for i in range(featurecnt):
+                featurelist.append(Feature(
+                    self.fontfile.read(4).decode(),
+                    self.fontfile.readuint16() + featurelisttableloc,
+                    self.fontfile))
 
         # Read Lookups
-        lookuplisttableloc = self.ofst + lookupofst
-        lookupcnt = self.fontfile.readuint16(lookuplisttableloc)
         self.lookups = []
-        for i in range(lookupcnt):
-            self.lookups.append(GposLookup(
-                self.fontfile.readuint16() + lookuplisttableloc,
-                self.fontfile))
+        if lookupofst != 0:
+            lookuplisttableloc = self.ofst + lookupofst
+            lookupcnt = self.fontfile.readuint16(lookuplisttableloc)
+            for i in range(lookupcnt):
+                self.lookups.append(GposLookup(
+                    self.fontfile.readuint16() + lookuplisttableloc,
+                    self.fontfile))
 
         # Put everything in a dictionary for access
         self.features = {}
@@ -81,7 +84,7 @@ class Gpos:
                 langdict[langname] = featdict
             self.features[scrname] = langdict
 
-        if 'latn' not in self.features:
+        if self.features and 'latn' not in self.features:
             self.language.script = list(self.features.keys())[0]
 
     def features_available(self):
@@ -153,7 +156,7 @@ class GposLookup:
                 assert fmt == 1
                 tabletype = self.fontfile.readuint16()
                 tblofst += self.fontfile.readuint32()
-                fmt = self.fontfile.readuint16(tblofst)
+                fmt = self.fontfile.readuint16(self.ofst+tblofst)
 
             if tabletype == 1 and fmt == 1:
                 self.subtables.append(SingleAdjustmentSubtable(
@@ -161,7 +164,6 @@ class GposLookup:
             elif tabletype == 1 and fmt == 2:
                 self.subtables.append(SingleAdjustmentSubtable2(
                     tblofst + self.ofst, self.fontfile))
-
             elif tabletype == 2:  # Pair adjustment positioning
                 self.subtables.append(PairAdjustmentSubtable(
                         tblofst + self.ofst, self.fontfile))

@@ -6,7 +6,7 @@ from collections import namedtuple
 import random
 import logging
 
-from .tables import Script, Feature, Coverage, Language, ClassDef
+from .tables import Script, Feature, Coverage, Language, ClassDef, ClassDefBlank
 
 if TYPE_CHECKING:
     from .fontread import FontReader
@@ -168,8 +168,8 @@ class LookupLigatureSub(LookupSubtable):
                 ligofsts.append(self.fontfile.readuint16())
 
             ligs = {}
-            for _ in range(cnt):
-                ligglyph = self.fontfile.readuint16()
+            for ligofst in ligofsts:
+                ligglyph = self.fontfile.readuint16(ofst+ligofst)
                 compcount = self.fontfile.readuint16()
                 compglyphs = []
                 for _ in range(compcount-1):
@@ -284,8 +284,11 @@ class LookupChainedSub2(LookupSubtable):
         for i in range(rulesetcnt):
             rulesetofsts.append(self.fontfile.readuint16())
 
-        self.rules = []
+        self.rules: list[list[ChainedSeqRule]] = []
         for rulesetofst in rulesetofsts:
+            if rulesetofst == 0:
+                self.rules.append([])
+                continue
             rulecnt = self.fontfile.readuint16(self.ofst+rulesetofst)
             ruleofsts = []
             for i in range(rulecnt):
@@ -316,9 +319,9 @@ class LookupChainedSub2(LookupSubtable):
                     ChainedSeqRule(backseq, inputseq, lookaheadseq, sequencelookup))
             self.rules.append(ruleset)
         self.covtable = Coverage(self.ofst+covofst, self.fontfile)
-        self.backtrackClass = ClassDef(self.ofst+backtrackofst, self.fontfile)
-        self.inputClass = ClassDef(self.ofst+inputofst, self.fontfile)
-        self.lookaheadClass = ClassDef(self.ofst+lookaheadofst, self.fontfile)
+        self.backtrackClass = ClassDef(self.ofst+backtrackofst, self.fontfile) if backtrackofst else ClassDefBlank(0, self.fontfile)
+        self.inputClass = ClassDef(self.ofst+inputofst, self.fontfile) if inputofst else ClassDefBlank(0, self.fontfile)
+        self.lookaheadClass = ClassDef(self.ofst+lookaheadofst, self.fontfile) if lookaheadofst else ClassDefBlank(0, self.fontfile)
 
     def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: Optional[str] = None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
@@ -530,34 +533,37 @@ class Gsub:
             logging.warning('GSUB has feature variations - unimplemented')
 
         # Read scripts
-        scriptlisttableloc = self.ofst + scriptofst
-        scriptcnt = self.fontfile.readuint16(scriptlisttableloc)
         self.scripts = {}
-        for i in range(scriptcnt):
-            tag = self.fontfile.read(4).decode()
-            self.scripts[tag] = Script(
-                tag,
-                self.fontfile.readuint16() + scriptlisttableloc,
-                self.fontfile)
+        if scriptofst != 0:
+            scriptlisttableloc = self.ofst + scriptofst
+            scriptcnt = self.fontfile.readuint16(scriptlisttableloc)
+            for i in range(scriptcnt):
+                tag = self.fontfile.read(4).decode()
+                self.scripts[tag] = Script(
+                    tag,
+                    self.fontfile.readuint16() + scriptlisttableloc,
+                    self.fontfile)
 
         # Read features
-        featurelisttableloc = self.ofst + featureofst
-        featurecnt = self.fontfile.readuint16(featurelisttableloc)
         self.featurelist = []
-        for i in range(featurecnt):
-            self.featurelist.append(Feature(
-                self.fontfile.read(4).decode(),
-                self.fontfile.readuint16() + featurelisttableloc,
-                self.fontfile))
+        if featureofst != 0:
+            featurelisttableloc = self.ofst + featureofst
+            featurecnt = self.fontfile.readuint16(featurelisttableloc)
+            for i in range(featurecnt):
+                self.featurelist.append(Feature(
+                    self.fontfile.read(4).decode(),
+                    self.fontfile.readuint16() + featurelisttableloc,
+                    self.fontfile))
 
         # Read Lookups
-        lookuplisttableloc = self.ofst + lookupofst
-        lookupcnt = self.fontfile.readuint16(lookuplisttableloc)
         self.lookups = []
-        for i in range(lookupcnt):
-            self.lookups.append(GSUBLookup(
-                self.fontfile.readuint16() + lookuplisttableloc,
-                self.fontfile))
+        if lookupofst != 0:
+            lookuplisttableloc = self.ofst + lookupofst
+            lookupcnt = self.fontfile.readuint16(lookuplisttableloc)
+            for i in range(lookupcnt):
+                self.lookups.append(GSUBLookup(
+                    self.fontfile.readuint16() + lookuplisttableloc,
+                    self.fontfile))
 
         # Put everything in a dictionary for access
         self.features = {}
@@ -574,7 +580,7 @@ class Gsub:
                 langdict[langname] = featdict
             self.features[scrname] = langdict            
 
-        if 'latn' not in self.features:
+        if self.features and 'latn' not in self.features:
             self.language.script = list(self.features.keys())[0]
 
     def features_available(self) -> dict[str, list[GSUBLookup]]:

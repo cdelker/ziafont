@@ -130,6 +130,16 @@ class ClassDef:
         return f'<ClassDefTable {hex(self.ofst)}>'
 
 
+class ClassDefBlank(ClassDef):
+    ''' Blank class definition '''
+    def __init__(self, ofst: int, fontfile: FontReader):
+        self.ofst = ofst
+        self.fontfile = fontfile
+
+    def get_class(self, glyphid: int) -> int:
+        return 0
+
+
 class Feature:
     ''' Feature Table for GPOS/GSUB '''
     def __init__(self, tag: str, ofst: int, fontfile: FontReader):
