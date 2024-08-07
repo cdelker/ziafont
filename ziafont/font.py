@@ -353,12 +353,20 @@ class Font:
             self._glyphs[glyphid] = glyph
         return glyph
 
-    def advance(self, glyph: int) -> int:
+    def advance(self, glyph: int, glyph2: int|None) -> int:
         ''' Get advance width in font units '''
         try:
             adv = self.advwidths[glyph].width
         except IndexError:
             adv = self.info.layout.advwidthmax.width
+
+        if self.features.get('kern', True) and glyph2 and self.gpos:
+            # Only getting x-advance for first glyph.
+            pos = self.gpos.position(
+                [self.glyph_fromid(glyph), self.glyph_fromid(glyph2)],
+                {'kern': True})
+            adv = pos[1][0]
+
         return adv
 
     def getsize(self, s) -> tuple[float, float]:

@@ -63,9 +63,10 @@ class SimpleGlyph:
             elm = self.svgpath(x0=x, y0=y, scale_factor=scale_factor)
         return elm
 
-    def advance(self) -> int:
+    def advance(self, nextchr: 'SimpleGlyph'|None = None) -> int:
         ''' Get advance width in glyph units  '''
-        return self.font.advance(self.index)
+        nextid = nextchr.index if nextchr else None
+        return self.font.advance(self.index, nextid)
 
     def svgpath(self, x0: float = 0, y0: float = 0, scale_factor: float = 1) -> Optional[ET.Element]:
         ''' Get svg <path> element for glyph, normalized to 12-point font '''
