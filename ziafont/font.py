@@ -604,14 +604,18 @@ class Text:
             lineglyphs = [(glyph, x*scale, -y*scale) for glyph, (x, y) in zip(glyphs, xy)]
 
             # Accumulate multi-line widths/heights
-            xmin = min(xmin, glyphs[0].bbox.xmin*scale)
-            last_advance = glyphs[-1].advance()
-            linewidth = (xy[-1][0] + last_advance) * scale
-            if glyphs[-1].bbox.xmax > last_advance:
-                # Make linewidth a bit wider to grab right edge
-                # that extends beyond advance width
-                linewidth += (glyphs[-1].bbox.xmax - last_advance) * scale
-                linewidth += (-glyphs[0].bbox.xmin) * scale
+            if glyphs:
+                xmin = min(xmin, glyphs[0].bbox.xmin*scale)
+                last_advance = glyphs[-1].advance()
+                linewidth = (xy[-1][0] + last_advance) * scale
+                if glyphs[-1].bbox.xmax > last_advance:
+                    # Make linewidth a bit wider to grab right edge
+                    # that extends beyond advance width
+                    linewidth += (glyphs[-1].bbox.xmax - last_advance) * scale
+                    linewidth += (-glyphs[0].bbox.xmin) * scale
+            else:
+                # Blank line
+                linewidth = 0
             linewidths.append(linewidth)
             allglyphs.append(lineglyphs)
 
