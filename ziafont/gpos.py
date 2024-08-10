@@ -95,7 +95,7 @@ class Gpos:
         ''' Initialize features that can be set by user '''
         avail = list(self.features_available().keys())
         avail = [feat for feat in avail if feat not in PERM_FEATURES]
-        return {feat: True if feat in ON_FEATURES else False for feat in avail}
+        return {feat: feat in ON_FEATURES for feat in avail}
 
     def position(self, glyphs: list[SimpleGlyph], features: dict[str, bool]) -> list[tuple[int, int]]:
         ''' Calculate x, y position of each glyph using the given features '''
@@ -142,7 +142,7 @@ class GposLookup:
         self.flag = self.fontfile.readuint16()
         subtablecnt = self.fontfile.readuint16()
         self.tableofsts = []
-        for i in range(subtablecnt):
+        for _ in range(subtablecnt):
             self.tableofsts.append(self.fontfile.readuint16())
         self.markfilterset = None
         if self.flag & USE_MARK_FILTERING_SET:
@@ -265,7 +265,7 @@ class SingleAdjustmentSubtable2(GposSubtable):
         valueformat = self.fontfile.readuint16()
         valuecount = self.fontfile.readuint16()
         self.valuerecords = []
-        for i in range(valuecount):
+        for _ in range(valuecount):
             self.valuerecords.append(self.fontfile.readvaluerecord(valueformat))
         self.coverage = Coverage(self.covofst+self.ofst, self.fontfile)
         self.fontfile.seek(fileptr)  # Put file pointer back
@@ -407,7 +407,7 @@ def read_markarray_table(ofst, fontfile):
     cnt = fontfile.readuint16(ofst)
     MarkRecord = namedtuple('MarkRecord', ['markclass', 'anchortable'])
     markrecords = []
-    for i in range(cnt):
+    for _ in range(cnt):
         markclass = fontfile.readuint16()
         anchorofst = fontfile.readuint16()
         ptr = fontfile.tell()

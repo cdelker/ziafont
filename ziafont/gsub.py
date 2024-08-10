@@ -131,10 +131,9 @@ class LookupAlternate(LookupSubtable):
 
     def sub(self, glyphids: list[int], lookups: list[GSUBLookup], name: Optional[str] = None) -> list[int]:
         ''' Apply glyph substitution to list of glyph ids '''
-        for i in range(len(glyphids)):
-            covidx = self.covtable.covidx(glyphids[i])
+        for i, gid in enumerate(glyphids):
+            covidx = self.covtable.covidx(gid)
             if covidx is not None:
-
                 if name == 'rand':
                     glyphids[i] = random.choice(self.altglyphs[covidx])
                 else:
@@ -281,7 +280,7 @@ class LookupChainedSub2(LookupSubtable):
         lookaheadofst = self.fontfile.readuint16()
         rulesetcnt = self.fontfile.readuint16()
         rulesetofsts = []
-        for i in range(rulesetcnt):
+        for _ in range(rulesetcnt):
             rulesetofsts.append(self.fontfile.readuint16())
 
         self.rules: list[list[ChainedSeqRule]] = []
@@ -377,25 +376,25 @@ class LookupChainedSub1(LookupSubtable):
         for setofst in setofsts:
             cnt = self.fontfile.readuint16(self.ofst+setofst)
             ruleofsts = []
-            for i in range(cnt):
+            for _ in range(cnt):
                 ruleofsts.append(self.fontfile.readuint16())
             ruleset = []
             for ruleofst in ruleofsts:
                 backglyphcount = self.fontfile.readuint16(self.ofst+setofst+ruleofst)
                 backtrackSeq = []
-                for i in range(backglyphcount):
+                for _ in range(backglyphcount):
                     backtrackSeq.append(self.fontfile.readuint16())
                 inputglyphcount = self.fontfile.readuint16()
                 inputSequence = []
-                for i in range(inputglyphcount-1):
+                for _ in range(inputglyphcount-1):
                     inputSequence.append(self.fontfile.readuint16())
                 lookaheadglyphcount = self.fontfile.readuint16()
                 lookaheadSequence = []
-                for i in range(lookaheadglyphcount):
+                for _ in range(lookaheadglyphcount):
                     lookaheadSequence.append(self.fontfile.readuint16())
                 seqlookupcnt = self.fontfile.readuint16()
                 sequencelookup = []
-                for i in range(seqlookupcnt):
+                for _ in range(seqlookupcnt):
                     sequencelookup.append(SequenceLookupRecord(
                         self.fontfile.readuint16(),   # SequenceIndex
                         self.fontfile.readuint16()))  # LookupListIndex
@@ -578,7 +577,7 @@ class Gsub:
                     tables = [self.lookups[i] for i in lookups]
                     featdict[feat] = tables
                 langdict[langname] = featdict
-            self.features[scrname] = langdict            
+            self.features[scrname] = langdict
 
         if self.features and 'latn' not in self.features:
             self.language.script = list(self.features.keys())[0]
@@ -591,14 +590,14 @@ class Gsub:
         ''' Initialize features that can be set by user '''
         avail = list(self.features_available().keys())
         avail = [feat for feat in avail if feat not in PERM_FEATURES]
-        return {feat: True if feat in ON_FEATURES else False for feat in avail}
+        return {feat: feat in ON_FEATURES for feat in avail}
 
     def sub(self, glyphids: list[int], features: dict[str, bool]):
         ''' Apply glyph substitution to list of glyph ids. Features
             enable/disable certain substitutions.
         '''
         feattable = self.features_available()
-        
+
         def apply_feature(name, glyphids):
             tables = feattable.get(name, [])
             for table in tables:

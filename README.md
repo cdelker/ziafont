@@ -4,4 +4,4 @@ Ziafont reads TrueType/OpenType font files and draws characters and strings as S
 
 Ziafont supports fonts with TrueType glyph outlines contained in a "glyf" table in the font (these fonts typically have a .ttf extensions), or fonts with a "CFF " table (typically with a .otf extension). Kerning adjustment and glyph substitution are supported if the font has a "GPOS" table.
 
-Documentation is available at [readthedocs](https://ziafont.readthedocs.io). There is also an [online demo](https://cdelker.github.io/pyscript/ziafont.html) of Glyph rendering using Ziafont.
+Documentation is available at [readthedocs](https://ziafont.readthedocs.io). There is also an [online demo](https://cdelker.github.io/pyscript/ziafont.html).

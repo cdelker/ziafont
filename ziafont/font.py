@@ -65,7 +65,7 @@ class Font:
         if 'GPOS' in self.tables:
             self.gpos = gpos.Gpos(self.tables['GPOS'].offset, self.fontfile)
             self.features.update(self.gpos.init_user_features())
-    
+
         self.gsub = None
         if 'GSUB' in self.tables:
             self.gsub = gsub.Gsub(self.tables['GSUB'].offset, self.fontfile)

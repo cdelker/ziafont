@@ -55,6 +55,7 @@ class DescribeFont:
         return self.table()
 
     def format_languages(self):
+        ''' Format the scripts/languages in the font '''
         out = ''
         for script in self.font.scripts():
             out += script
@@ -90,7 +91,7 @@ class DescribeFont:
             table += table_row('GSUB features', ', '.join(self.font.gsub.features_available().keys()))
         else:
             table += table_row('GSUB features', 'None')
-        
+
         if self.font.gpos is not None:
             table += table_row('GPOS features', ', '.join(self.font.gpos.features_available().keys()))
         else:
@@ -98,7 +99,7 @@ class DescribeFont:
         table += table_row('Scripts/Languages', self.format_languages())
         table += '</table>'
         return table
-    
+
 
 class InspectGlyph:
     ''' Draw glyph svg with test/debug lines '''
@@ -333,7 +334,7 @@ class ShowFeature:
             elif lookup.type == 6 and lookup.fmt == 3:
                 html += ShowLookup63(lookup, self.font, self.size).table()
             else:
-                html += f'<p>N/A</p>'
+                html += '<p>N/A</p>'
         return html
 
 
@@ -427,7 +428,7 @@ class ShowLookup3(LookupDisplay):
                 svg = ''
                 for gid in altglyphs:
                     svg += self.svg_for_gid(gid)
-                
+
                 glyphsvg = self.svg_for_gid(glyph)
                 table += table_row(
                     glyphsvg,

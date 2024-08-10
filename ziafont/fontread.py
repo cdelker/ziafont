@@ -1,5 +1,5 @@
 ''' CLass for reading bytes from a font file '''
-
+from __future__ import annotations
 import struct
 from datetime import datetime, timedelta
 from io import BytesIO
