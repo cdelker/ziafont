@@ -1,5 +1,14 @@
 # Release notes
 
+### 0.9 - 2024-08-10
+
+- Locate fonts by name in system font paths
+- Enable/disable all font features via dictionary
+- Added font and glyph inspection classes
+- Fixed loading some fonts with null table offsets
+- Fixed multiline text containing blank lines
+
+
 ### 0.8 - 2024-04-27
 
 - Tighten bounding box for text size calculations

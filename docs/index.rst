@@ -41,7 +41,7 @@ No dependencies are required.
 Demo
 ----
 
-See Ziafont in action as it runs in your browser through PyScript `here <https://cdelker.bitbucket.io/pyscript/ziafontstr.html>`_!
+See Ziafont in action as it runs in your browser through PyScript `here <https://cdelker.github.io/pyscript/ziafont.html>`_!
 
 Ziafont is used by the `Ziamath <https://ziamath.readthedocs.io>`_ and `Ziaplot <https://ziaplot.readthedocs.io>`_ Python packages.
 
