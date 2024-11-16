@@ -47,6 +47,15 @@ class SimpleGlyph:
         ''' Convert font units to points '''
         return value * self._points_per_unit * scale_factor
 
+    @property
+    def viewbox(self) -> tuple[float, float, float, float]:
+        ''' Get viewbox of Glyph '''
+        xmin = min(self.funits_to_points(self.bbox.xmin), 0)
+        xmax = self.funits_to_points(self.bbox.xmax)
+        ymax = self.funits_to_points(max(self.font.info.layout.ymax, self.bbox.ymax))
+        ymin = self.funits_to_points(min(self.font.info.layout.ymin, self.bbox.ymin))
+        return xmin, xmax, ymin, ymax
+
     def place(self, x: float, y: float, point_size: float) -> Optional[ET.Element]:
         ''' Get <use> svg tag translated/scaled to the right position '''
         scale_factor = point_size / self.DFLT_SIZE_PT
@@ -54,11 +63,15 @@ class SimpleGlyph:
             max(self.bbox.ymax, self.font.info.layout.ymax), scale_factor)
         elm: Optional[ET.Element]
         if config.svg2:
+            dx = min(self.funits_to_points(self.bbox.xmin, scale_factor), 0)
             elm = ET.Element('use')
             elm.attrib['href'] = f'#{self.id}'
-            dx = min(self.funits_to_points(self.bbox.xmin, scale_factor), 0)
-            elm.attrib['transform'] = (f'translate({fmt(x+dx)} '
-                                       f'{fmt(y-yshift)}) scale({fmt(scale_factor)})')
+            xmin, xmax, ymin, ymax = self.viewbox
+            elm.attrib['href'] = f'#{self.id}'
+            elm.attrib['x'] = fmt(x+dx)
+            elm.attrib['y'] = fmt(y-yshift)
+            elm.attrib['width'] = fmt((xmax-xmin)*scale_factor)
+            elm.attrib['height'] = fmt((ymax-ymin)*scale_factor)
         else:
             elm = self.svgpath(x0=x, y0=y, scale_factor=scale_factor)
         return elm
@@ -83,18 +96,10 @@ class SimpleGlyph:
 
     def svgsymbol(self) -> ET.Element:
         ''' Get svg <symbol> element for this glyph, scaled to 12-point font '''
-        xmin = min(self.funits_to_points(self.bbox.xmin), 0)
-        xmax = self.funits_to_points(self.bbox.xmax)
-        width = xmax-xmin
-        ymax = self.funits_to_points(max(self.font.info.layout.ymax, self.bbox.ymax))
-        ymin = self.funits_to_points(min(self.font.info.layout.ymin, self.bbox.ymin))
-        height = ymax - ymin
-
+        xmin, xmax, ymin, ymax = self.viewbox
         sym = ET.Element('symbol')
         sym.attrib['id'] = self.id
-        sym.attrib['width'] = fmt(width)
-        sym.attrib['height'] = fmt(height)
-        sym.attrib['viewBox'] = f'{fmt(xmin)} {fmt(-ymax)} {fmt(width)} {fmt(height)}'
+        sym.attrib['viewBox'] = f'{fmt(xmin)} {fmt(-ymax)} {fmt(xmax-xmin)} {fmt(ymax-ymin)}'
         if (path := self.svgpath()) is not None:
             sym.append(path)
         return sym
@@ -135,8 +140,10 @@ class SimpleGlyph:
             svg.append(symbol)
             g = ET.SubElement(svg, 'use')
             g.attrib['href'] = f'#{self.id}'
-            g.attrib['transform'] = (f'translate({fmt(xmin)}, '
-                                     f'{fmt(base-ymax)}) scale({fmt(scale_factor)})')
+            g.attrib['width'] = fmt(xmax-xmin)
+            g.attrib['height'] = fmt(ymax-ymin)
+            g.attrib['x'] = fmt(xmin)
+            g.attrib['y'] = fmt(base-ymax)
         return svg
 
     def test(self, pxwidth: float = 400, pxheight: float = 400) -> InspectGlyph:

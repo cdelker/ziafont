@@ -450,8 +450,6 @@ class Text:
         ''' Get SVG XML element '''
         svg = ET.Element('svg')
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
-        if config.svg2:
-            svg.attrib['xmlns:xlink'] = 'http://www.w3.org/1999/xlink'
         ret, (xmin, xmax, ymin, ymax) = self._drawon(svg)
         w = xmax-xmin
         h = ymax-ymin
