@@ -450,6 +450,9 @@ class Text:
         ''' Get SVG XML element '''
         svg = ET.Element('svg')
         svg.attrib['xmlns'] = 'http://www.w3.org/2000/svg'
+        if isinstance(self.str, str):
+            title = ET.SubElement(svg, 'title')
+            title.text = self.str
         ret, (xmin, xmax, ymin, ymax) = self._drawon(svg)
         w = xmax-xmin
         h = ymax-ymin
