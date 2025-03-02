@@ -1,5 +1,11 @@
 # Release notes
 
+### 0.10 - 2025-03-02
+
+- Insert `<title>` tag in SVG for accessibility
+- Fix for sizing of SVG `<symbol>` tags
+
+
 ### 0.9 - 2024-08-10
 
 - Locate fonts by name in system font paths
