@@ -53,23 +53,37 @@ def font_list(paths: Optional[Sequence[Path | str]] = None) -> list[Path]:
 def readnames(path: Path) -> FontNames:
     ''' Quickly read NAME table from TTF without loading entire font '''
     with open(path, 'rb') as f:
+        nameids = [''] * 15  # Empty strings for nameId table
+
         f.read(4)  # Skip scalartype
-        numtables = struct.unpack('>H', f.read(2))[0]
+        try:
+            numtables = struct.unpack('>H', f.read(2))[0]
+        except struct.error:
+            # empty/invalid font file
+            return FontNames(*nameids)
+
         f.read(6)  # Skip searchrange, entrysel, rangeshift
+        tableoffset = -1
         for i in range(numtables):
-            tag = f.read(4).decode()
-            if tag == 'name':
-                chksum = struct.unpack('>I', f.read(4))[0]
-                tableoffset = struct.unpack('>I', f.read(4))[0]
-                length = struct.unpack('>I', f.read(4))[0]
-                break
+            try:
+                tag = f.read(4).decode()
+            except UnicodeDecodeError:
+                return FontNames(*nameids)  # invalid font file
             else:
-                f.read(12) # Skip
+                if tag == 'name':
+                    chksum = struct.unpack('>I', f.read(4))[0]
+                    tableoffset = struct.unpack('>I', f.read(4))[0]
+                    length = struct.unpack('>I', f.read(4))[0]
+                    break
+                else:
+                    f.read(12) # Skip
+        if tableoffset == -1:
+            return FontNames(*nameids)  # invalid font file
+
         f.seek(tableoffset)
         namefmt = struct.unpack('>H', f.read(2))[0]
         count = struct.unpack('>H', f.read(2))[0]
         strofst = struct.unpack('>H', f.read(2))[0]
-        nameids = [''] * 15  # Empty strings for nameId table
 
         namerecords = []
         for i in range(count):
