@@ -14,15 +14,15 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-import pkg_resources
+import importlib
 
 # -- Project information -----------------------------------------------------
 
 project = 'ziafont'
-copyright = '2021-2024, Collin J. Delker'
+copyright = '2021-2025, Collin J. Delker'
 author = 'Collin J. Delker'
 
-release = pkg_resources.get_distribution(project).version
+release = importlib.metadata.version('ziafont')
 
 # -- General configuration ---------------------------------------------------
 

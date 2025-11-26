@@ -1,5 +1,11 @@
 # Release notes
 
+### 0.11 - In progress
+
+- Fix bug with incorrectly rendered closed paths in some fonts
+
+
+
 ### 0.10 - 2025-03-02
 
 - Insert `<title>` tag in SVG for accessibility
