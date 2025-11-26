@@ -130,12 +130,11 @@ def read_simpleglyph(font: Font, index: int, numcontours: int, charbox: BBox) ->
         if c[0]:
             # Path STARTS with a control point. Wrap last point in path.
             # Unna-Regular.ttf is an example.
-            operators.append(Moveto(p[-1]))
-            if c[1]:
-                pim = (p[0] + p[1])/2
-                operators.append(Quad(p[0], pim))
+            if c[-1]:
+                pim = (p[0] + p[-1])/2
+                operators.append(Moveto(pim))  # Last point is also control
             else:
-                operators.append(Quad(p[0], p[1]))
+                operators.append(Moveto(p[-1]))
         else:
             operators.append(Moveto(p[0]))
 
@@ -143,8 +142,12 @@ def read_simpleglyph(font: Font, index: int, numcontours: int, charbox: BBox) ->
         while i < npoints:
             if c[i]:  # This is a control point
                 if i == npoints-1:
-                    # Last point is control. End point wraps to start point
-                    operators.append(Quad(p[i], p[0]))
+                    # Last point is control. End point wraps to start point.
+                    if c[0]:  # First point is also control, use midpoint
+                        pim = (p[0] + p[-1])/2
+                        operators.append(Quad(p[i], pim))
+                    else:  # First point is real
+                        operators.append(Quad(p[i], p[0]))
                     i += 1
                 elif c[i+1]:
                     # Next point is also control.
