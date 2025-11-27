@@ -1,9 +1,8 @@
 # Release notes
 
-### 0.11 - In progress
+### 0.11 - 2025-11-26
 
 - Fix bug with incorrectly rendered closed paths in some fonts
-
 
 
 ### 0.10 - 2025-03-02
