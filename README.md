@@ -1,3 +1,7 @@
+**This repository has moved to [codeberg](https://codeberg.org/cdelker/ziafont).**
+
+---
+
 # ziafont
 
 Ziafont reads TrueType/OpenType font files and draws characters and strings as SVG <path> elements. Unlike the SVG <text> element, the output of Ziafont's SVG will render identically on any system, independent of whether the original font is available.
